@@ -1,0 +1,6 @@
+{
+  "name": "Meridian Bank Customer Churn Analytics",
+  "description": "Executive customer churn, demographics, satisfaction, and rule-based retention risk analytics dashboard for Meridian Bank with live Google Sheets sync and CSV upload.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

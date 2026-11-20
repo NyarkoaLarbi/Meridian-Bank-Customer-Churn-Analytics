@@ -1,0 +1,3925 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Meridian Bank Customer Churn Analytics</title>
+  <meta name="description" content="Executive customer churn, demographics, satisfaction, and rule-based retention risk analytics dashboard for Meridian Bank with live Google Sheets sync and CSV upload." />
+  <meta property="og:title" content="Meridian Bank Customer Churn Analytics" />
+  <meta property="og:description" content="Executive customer churn, demographics, satisfaction, and rule-based retention risk analytics dashboard for Meridian Bank." />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
+
+  <!-- Fonts: Plus Jakarta Sans (Display & Body) + IBM Plex Mono (Tabular Telemetry) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Chart.js & PapaParse -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <style>
+    :root {
+      /* Meridian Bank Brand Tokens */
+      --brand-navy: #0B1F3A;
+      --brand-royal: #174A7E;
+      --brand-gold: #C8A96A;
+      --brand-gold-deep: #9A7B3E;
+      --brand-amber: #FF9900;
+      --brand-amber-deep: #B86800;
+
+      /* Light Theme Surfaces (60-30-10) */
+      --bg-canvas: #F4F6F9;
+      --bg-surface: #FFFFFF;
+      --bg-subtle: #EEF2F7;
+      --bg-hover: #E6ECF4;
+      --border-hairline: #DCE3ED;
+      --border-strong: #C5D0DF;
+
+      /* Text */
+      --text-primary: #0B1F3A;
+      --text-secondary: #43556B;
+      --text-muted: #64748B;
+      --text-inverse: #FFFFFF;
+
+      /* Semantic Data States */
+      --state-retained: #174A7E;
+      --state-churned: #B91C1C;
+      --state-churned-bg: #FEF2F2;
+      --state-churned-border: #FECACA;
+      --state-positive: #15803D;
+      --state-positive-bg: #F0FDF4;
+      --state-positive-border: #BBF7D0;
+      --state-warning: #B86800;
+      --state-warning-bg: #FFF7E6;
+      --state-warning-border: #FF9900;
+      --state-critical: #991B1B;
+      --state-critical-bg: #FEF2F2;
+      --state-critical-border: #FCA5A5;
+
+      /* Typography & Layout */
+      --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+      --shadow-card: 0 1px 2px rgba(11, 31, 58, 0.04);
+      --transition-fast: 150ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    html.dark {
+      --bg-canvas: #060E1A;
+      --bg-surface: #0B1F3A;
+      --bg-subtle: #11294B;
+      --bg-hover: #173661;
+      --border-hairline: #1D3A61;
+      --border-strong: #2A4F80;
+
+      --text-primary: #F8FAFC;
+      --text-secondary: #CBD5E1;
+      --text-muted: #94A3B8;
+      --text-inverse: #0B1F3A;
+
+      --state-retained: #4E8FE3;
+      --state-churned: #F87171;
+      --state-churned-bg: rgba(185, 28, 28, 0.18);
+      --state-churned-border: rgba(248, 113, 113, 0.35);
+      --state-positive: #4ADE80;
+      --state-positive-bg: rgba(21, 128, 61, 0.18);
+      --state-positive-border: rgba(74, 222, 128, 0.35);
+      --state-warning: #FF9900;
+      --state-warning-bg: rgba(255, 153, 0, 0.16);
+      --state-warning-border: rgba(255, 153, 0, 0.5);
+      --state-critical: #FCA5A5;
+      --state-critical-bg: rgba(153, 27, 27, 0.26);
+      --state-critical-border: rgba(248, 113, 113, 0.45);
+
+      --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.28);
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg-canvas);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 15px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      transition: background-color var(--transition-fast), color var(--transition-fast);
+    }
+
+    html.dark body {
+      letter-spacing: 0.005em;
+    }
+
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+      font-family: var(--font-mono);
+    }
+
+    /* Accessibility focus */
+    :focus-visible {
+      outline: 2px solid var(--brand-amber);
+      outline-offset: 2px;
+    }
+
+    /* Layout Shell */
+    .app-shell {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1440px;
+      margin: 0 auto;
+      padding-left: 24px;
+      padding-right: 24px;
+    }
+
+    /* Top Bar Contract */
+    .top-header {
+      background-color: var(--bg-surface);
+      border-top: 16px solid var(--brand-amber);
+      border-bottom: 1px solid var(--border-hairline);
+      position: sticky;
+      top: 0;
+      z-index: 40;
+    }
+
+    .header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      min-height: 82px;
+      padding-top: 8px;
+      padding-bottom: 8px;
+    }
+
+    .brand-zone {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+      flex-shrink: 0;
+    }
+
+    .brand-logo-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #FFFFFF;
+      border-radius: var(--radius-sm);
+      padding: 2px 4px;
+      border: 1px solid transparent;
+      flex-shrink: 0;
+    }
+
+    html.dark .brand-logo-wrap {
+      border-color: rgba(255, 153, 0, 0.45);
+    }
+
+    .brand-logo-img {
+      height: 74px;
+      width: auto;
+      display: block;
+      object-fit: contain;
+    }
+
+    .brand-divider {
+      width: 1.5px;
+      height: 42px;
+      background: var(--text-primary);
+      opacity: 0.85;
+      flex-shrink: 0;
+    }
+
+    .brand-title {
+      font-size: clamp(21px, 1.85vw, 27px);
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      color: var(--text-primary);
+      white-space: nowrap;
+      line-height: 1.1;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    /* Primary Tabs (Zone 2) */
+    .nav-tabs {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--bg-subtle);
+      padding: 4px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-hairline);
+    }
+
+    .tab-btn {
+      appearance: none;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 7px 14px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: background-color var(--transition-fast), color var(--transition-fast);
+    }
+
+    .tab-btn:hover {
+      color: var(--text-primary);
+    }
+
+    .tab-btn.active {
+      background: #174A7E;
+      color: #FFFFFF;
+      box-shadow: inset 0 -2px 0 var(--brand-amber);
+    }
+
+    html.dark .tab-btn.active {
+      background: #174A7E;
+      color: #FFFFFF;
+      box-shadow: inset 0 -2px 0 var(--brand-amber);
+    }
+
+    /* Header Actions (Zone 3) */
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .btn {
+      appearance: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 9px 15px;
+      min-height: 38px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-hairline);
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+    }
+
+    .btn:hover:not(:disabled) {
+      background: var(--bg-subtle);
+      border-color: var(--border-strong);
+    }
+
+    .btn:active:not(:disabled) {
+      transform: translateY(1px);
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: var(--brand-royal);
+      border-color: var(--brand-royal);
+      color: #FFFFFF;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: var(--brand-navy);
+      border-color: var(--brand-amber);
+    }
+
+    html.dark .btn-primary {
+      background: var(--brand-amber);
+      border-color: var(--brand-amber);
+      color: #0B1F3A;
+    }
+
+    html.dark .btn-primary:hover:not(:disabled) {
+      background: #FFA826;
+      border-color: #FFA826;
+    }
+
+    .btn-gold-outline {
+      border-color: var(--brand-amber);
+      color: var(--text-primary);
+    }
+
+    #syncSheetBtn {
+      background: #FF9900;
+      border-color: #FF9900;
+      color: #0B1F3A;
+      font-weight: 700;
+    }
+
+    #syncSheetBtn:hover:not(:disabled) {
+      background: #E68A00;
+      border-color: #E68A00;
+      color: #0B1F3A;
+    }
+
+    html.dark #syncSheetBtn:hover:not(:disabled) {
+      background: #FFA826;
+      border-color: #FFA826;
+      color: #0B1F3A;
+    }
+
+    .btn-icon {
+      padding: 8px 10px;
+      min-width: 38px;
+    }
+
+    /* Workspace Sync & Data Toolbar */
+    .sync-strip {
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-hairline);
+      padding: 10px 0;
+    }
+
+    .sync-strip-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .sync-meta {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      font-size: 12.5px;
+      color: var(--text-secondary);
+    }
+
+    .sync-meta strong {
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    .meta-sep {
+      color: var(--text-muted);
+      user-select: none;
+    }
+
+    .sync-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    /* Data Source Configuration Drawer */
+    .sheet-drawer {
+      background: var(--bg-subtle);
+      border-bottom: 1px solid var(--border-hairline);
+      padding: 16px 0;
+      display: none;
+    }
+
+    .sheet-drawer.open {
+      display: block;
+    }
+
+    .sheet-drawer-grid {
+      display: grid;
+      grid-template-columns: 1.5fr 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+
+    .drawer-box {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-md);
+      padding: 16px;
+    }
+
+    .drawer-title {
+      font-size: 13.5px;
+      font-weight: 700;
+      margin: 0 0 6px 0;
+      color: var(--text-primary);
+    }
+
+    .drawer-desc {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      margin: 0 0 12px 0;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .text-input, .select-input {
+      width: 100%;
+      font-family: var(--font-sans);
+      font-size: 13px;
+      padding: 8px 11px;
+      min-height: 38px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-hairline);
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      transition: border-color var(--transition-fast);
+    }
+
+    .text-input:focus, .select-input:focus {
+      outline: none;
+      border-color: var(--brand-royal);
+    }
+
+    html.dark .text-input:focus, html.dark .select-input:focus {
+      border-color: var(--brand-gold);
+    }
+
+    .dropzone {
+      border: 1.5px dashed var(--border-strong);
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+      text-align: center;
+      font-size: 12.5px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: border-color var(--transition-fast), background-color var(--transition-fast);
+    }
+
+    .dropzone:hover, .dropzone.dragover {
+      border-color: var(--brand-gold);
+      background: var(--bg-subtle);
+    }
+
+    /* Alert / Error Banner */
+    .alert-banner {
+      margin-top: 16px;
+      padding: 12px 16px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--state-churned-border);
+      background: var(--state-churned-bg);
+      color: var(--state-churned);
+      display: none;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 13.5px;
+    }
+
+    .alert-banner.visible {
+      display: flex;
+    }
+
+    .alert-banner.info {
+      border-color: var(--border-strong);
+      background: var(--bg-surface);
+      color: var(--text-primary);
+    }
+
+    .alert-close {
+      background: transparent;
+      border: none;
+      color: inherit;
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 1;
+      padding: 2px 6px;
+    }
+
+    /* Main Content */
+    .main-content {
+      flex: 1;
+      padding: 20px 0 48px 0;
+    }
+
+    /* Shared Filter Panel */
+    .filter-panel {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-md);
+      padding: 0;
+      overflow: hidden;
+      margin-bottom: 18px;
+      box-shadow: var(--shadow-card);
+    }
+
+    .filter-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 18px;
+      background: #174A7E;
+      color: #FFFFFF;
+      flex-wrap: wrap;
+    }
+
+    .filter-title-group {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .filter-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #FFFFFF;
+      margin: 0;
+    }
+
+    .filter-count {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.88);
+    }
+
+    .btn-reset-filters {
+      background: #FFFFFF;
+      color: #0B1F3A;
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      font-weight: 600;
+      min-height: 32px;
+      padding: 5px 14px;
+      font-size: 12.5px;
+    }
+
+    .btn-reset-filters:hover:not(:disabled) {
+      background: #EEF2F7;
+      border-color: #FFFFFF;
+      color: #0B1F3A;
+    }
+
+    .filter-grid {
+      display: grid;
+      grid-template-columns: repeat(9, minmax(0, 1fr));
+      gap: 10px;
+      padding: 14px 18px 16px 18px;
+    }
+
+    .filter-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .filter-label {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .filter-field .select-input {
+      padding: 6px 8px;
+      font-size: 12.5px;
+      min-height: 36px;
+    }
+
+    /* KPI Strip (5 columns) */
+    .kpi-accent-bar {
+      height: 4px;
+      width: 100%;
+      background: var(--state-churned);
+      border-radius: 999px;
+      margin-bottom: 10px;
+    }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+
+    .kpi-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-md);
+      padding: 16px 18px;
+      box-shadow: var(--shadow-card);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .kpi-label {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .kpi-value {
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text-primary);
+      line-height: 1.15;
+    }
+
+    .kpi-value.danger {
+      color: var(--state-churned);
+    }
+
+    .kpi-value.accent {
+      color: var(--brand-royal);
+    }
+
+    html.dark .kpi-value.accent {
+      color: var(--brand-gold);
+    }
+
+    .kpi-sub {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    /* Section Headings */
+    .section-bar {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 24px 0 14px 0;
+      flex-wrap: wrap;
+    }
+
+    .section-heading {
+      font-size: 23px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text-primary);
+      margin: 0;
+      text-wrap: balance;
+    }
+
+    .section-note {
+      font-size: 12.5px;
+      color: var(--text-muted);
+    }
+
+    /* Chart Grid */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .chart-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-md);
+      padding: 18px;
+      box-shadow: var(--shadow-card);
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .chart-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .chart-title {
+      font-size: 14.5px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin: 0 0 2px 0;
+    }
+
+    .chart-subtitle {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin: 0;
+    }
+
+    .chart-wrap {
+      position: relative;
+      height: 270px;
+      width: 100%;
+    }
+
+    /* Tables */
+    .table-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-card);
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+
+    .table-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border-hairline);
+      flex-wrap: wrap;
+    }
+
+    .table-search-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+      min-width: 240px;
+      max-width: 420px;
+    }
+
+    .table-scroll {
+      overflow-x: auto;
+      width: 100%;
+    }
+
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      text-align: left;
+    }
+
+    table.data-table th {
+      background: var(--bg-subtle);
+      color: var(--text-secondary);
+      font-weight: 600;
+      font-size: 12px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border-hairline);
+      white-space: nowrap;
+      user-select: none;
+    }
+
+    table.data-table th.sortable {
+      cursor: pointer;
+    }
+
+    table.data-table th.sortable:hover {
+      color: var(--text-primary);
+      background: var(--bg-hover);
+    }
+
+    table.data-table th.num, table.data-table td.num {
+      text-align: right;
+    }
+
+    table.data-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border-hairline);
+      color: var(--text-primary);
+      vertical-align: middle;
+    }
+
+    table.data-table tbody tr {
+      transition: background-color var(--transition-fast);
+    }
+
+    table.data-table tbody tr.clickable {
+      cursor: pointer;
+    }
+
+    table.data-table tbody tr:hover {
+      background: var(--bg-subtle);
+    }
+
+    table.data-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .table-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 18px;
+      border-top: 1px solid var(--border-hairline);
+      font-size: 12.5px;
+      color: var(--text-muted);
+      flex-wrap: wrap;
+    }
+
+    .pagination-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Status & Risk Tags (restrained rectangular markers, no pill bloat) */
+    .status-tag {
+      display: inline-flex;
+      align-items: center;
+      font-size: 11.5px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 4px;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+
+    .status-retained {
+      background: var(--state-positive-bg);
+      color: var(--state-positive);
+      border-color: var(--state-positive-border);
+    }
+
+    .status-churned {
+      background: var(--state-churned-bg);
+      color: var(--state-churned);
+      border-color: var(--state-churned-border);
+    }
+
+    .risk-low {
+      background: var(--state-positive-bg);
+      color: var(--state-positive);
+      border-color: var(--state-positive-border);
+    }
+
+    .risk-moderate {
+      background: var(--bg-subtle);
+      color: var(--brand-royal);
+      border-color: var(--border-strong);
+    }
+
+    html.dark .risk-moderate {
+      color: #93C5FD;
+    }
+
+    .risk-high {
+      background: var(--state-warning-bg);
+      color: var(--state-warning);
+      border-color: var(--state-warning-border);
+    }
+
+    .risk-critical {
+      background: var(--state-critical-bg);
+      color: var(--state-critical);
+      border-color: var(--state-critical-border);
+    }
+
+    /* Insights & Methodology Grids */
+    .insights-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+
+    .insight-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-md);
+      padding: 16px 18px;
+      box-shadow: var(--shadow-card);
+    }
+
+    .insight-kicker {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: var(--brand-royal);
+      margin-bottom: 6px;
+    }
+
+    html.dark .insight-kicker {
+      color: var(--brand-gold);
+    }
+
+    .insight-headline {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin: 0 0 6px 0;
+    }
+
+    .insight-body {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin: 0;
+      line-height: 1.55;
+    }
+
+    .two-col-split {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 16px;
+      margin-bottom: 20px;
+      align-items: stretch;
+    }
+
+    .surface-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-md);
+      padding: 18px 20px;
+      box-shadow: var(--shadow-card);
+    }
+
+    .rule-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+      margin-top: 10px;
+    }
+
+    .rule-table th, .rule-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border-hairline);
+      text-align: left;
+    }
+
+    .rule-table th {
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 11.5px;
+    }
+
+    .rule-table td.pts {
+      text-align: right;
+      font-family: var(--font-mono);
+      font-weight: 600;
+      color: var(--brand-royal);
+    }
+
+    html.dark .rule-table td.pts {
+      color: var(--brand-gold);
+    }
+
+    .tier-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .tier-box {
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      background: var(--bg-subtle);
+    }
+
+    .tier-box-label {
+      font-size: 11.5px;
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+
+    .tier-box-range {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    .tier-box-count {
+      font-size: 18px;
+      font-weight: 700;
+      margin-top: 6px;
+      font-family: var(--font-mono);
+    }
+
+    .causation-list {
+      margin: 10px 0 0 0;
+      padding-left: 18px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .actions-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 14px;
+    }
+
+    /* Tab Panels */
+    .tab-panel {
+      display: none;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    /* Empty / Loading State */
+    .state-overlay {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-md);
+      padding: 48px 24px;
+      text-align: center;
+      margin: 20px 0;
+    }
+
+    .state-overlay h3 {
+      margin: 0 0 8px 0;
+      font-size: 17px;
+    }
+
+    .state-overlay p {
+      margin: 0 auto 16px auto;
+      max-width: 520px;
+      color: var(--text-secondary);
+      font-size: 13.5px;
+    }
+
+    /* Modals (Customer Detail & Executive Print Summary) */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(6, 14, 26, 0.65);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 100;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal-dialog {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-lg);
+      width: 100%;
+      max-width: 720px;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+    }
+
+    .modal-dialog.wide {
+      max-width: 1040px;
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-hairline);
+    }
+
+    .modal-body {
+      padding: 20px;
+      overflow-y: auto;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .detail-item {
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      background: var(--bg-subtle);
+    }
+
+    .detail-item-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .detail-item-val {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-top: 2px;
+    }
+
+    /* Spinner */
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .spin {
+      animation: spin 0.9s linear infinite;
+    }
+
+    /* Footer */
+    .app-footer {
+      border-top: 1px solid var(--border-hairline);
+      background: var(--bg-surface);
+      padding: 14px 0;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .footer-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    /* Print Styles */
+    @media print {
+      body {
+        background: #FFFFFF !important;
+        color: #0B1F3A !important;
+        font-size: 12px;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .modal-backdrop.open {
+        position: static !important;
+        background: transparent !important;
+        padding: 0 !important;
+        display: block !important;
+      }
+      .modal-dialog {
+        max-width: 100% !important;
+        max-height: none !important;
+        border: none !important;
+        box-shadow: none !important;
+      }
+      .modal-body {
+        overflow: visible !important;
+        padding: 0 !important;
+      }
+      .app-shell.printing-summary {
+        display: none !important;
+      }
+      .surface-card, .kpi-card, .chart-card, .table-card {
+        break-inside: avoid;
+        box-shadow: none !important;
+      }
+    }
+
+    /* Responsive Breakpoints */
+    @media (max-width: 1260px) {
+      .header-inner {
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      .header-right {
+        width: 100%;
+        justify-content: space-between;
+      }
+    }
+
+    @media (max-width: 1200px) {
+      .filter-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .kpi-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .insights-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .two-col-split {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 960px) {
+      .header-right {
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .nav-tabs {
+        order: 2;
+        width: 100%;
+        overflow-x: auto;
+      }
+      .charts-grid {
+        grid-template-columns: 1fr;
+      }
+      .sheet-drawer-grid {
+        grid-template-columns: 1fr;
+      }
+      .actions-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .container {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+      .top-header {
+        border-top-width: 10px;
+      }
+      .filter-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .kpi-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .insights-grid {
+        grid-template-columns: 1fr;
+      }
+      .tier-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .detail-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .brand-logo-img {
+        height: 54px;
+      }
+      .brand-divider, .brand-title {
+        display: none;
+      }
+      .header-actions .btn-text-hide {
+        display: none;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        transition: none !important;
+        animation: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell" id="appShell">
+    <!-- Top Bar: Brand · Tabs · Primary Actions -->
+    <header class="top-header no-print">
+      <div class="container header-inner">
+        <div class="brand-zone">
+          <div class="brand-logo-wrap">
+            <img
+              id="brandLogo"
+              class="brand-logo-img"
+              src="/assets/aistudio/Meridian_Bank_Navy_Gold_Emblem_0cf50531.png"
+              alt="Meridian Bank"
+              onerror="this.style.display='none'; document.getElementById('brandLogoFallback').style.display='flex';"
+            />
+            <div id="brandLogoFallback" style="display:none; align-items:center; gap:8px; padding:2px 4px;">
+              <svg width="34" height="34" viewBox="0 0 36 36" fill="none" aria-hidden="true">
+                <rect width="36" height="36" rx="6" fill="#0B1F3A"/>
+                <path d="M8 26V10L18 20L28 10V26" stroke="#C8A96A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <span style="font-weight:700; color:#0B1F3A; font-size:15px;">MERIDIAN BANK</span>
+            </div>
+          </div>
+          <span class="brand-divider" aria-hidden="true"></span>
+          <span class="brand-title">Customer Churn Analytics</span>
+        </div>
+
+        <div class="header-right">
+          <nav class="nav-tabs" role="tablist" aria-label="Dashboard sections">
+            <button class="tab-btn active" role="tab" aria-selected="true" data-tab="overview">Overview</button>
+            <button class="tab-btn" role="tab" aria-selected="false" data-tab="deepdive">Deep Dive</button>
+            <button class="tab-btn" role="tab" aria-selected="false" data-tab="retention">Retention Insights</button>
+          </nav>
+
+          <div class="header-actions">
+            <button class="btn btn-primary" id="syncSheetBtn" type="button" title="Retrieve latest data from Google Sheets">
+              <svg id="syncIcon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                <path d="M3 3v5h5"/>
+                <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
+                <path d="M16 16h5v5"/>
+              </svg>
+              <span id="syncBtnLabel">Sync Sheet</span>
+            </button>
+
+            <button class="btn" id="openSummaryBtn" type="button" title="Open printable executive management summary">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="6 9 6 2 18 2 18 9"/>
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+                <rect x="6" y="14" width="12" height="8"/>
+              </svg>
+              <span class="btn-text-hide">Summary</span>
+            </button>
+
+            <button class="btn" id="downloadHtmlBtn" type="button" title="Download standalone single-file HTML dashboard">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              <span class="btn-text-hide">Download HTML</span>
+            </button>
+
+            <button class="btn btn-icon" id="themeToggleBtn" type="button" aria-label="Toggle light or dark theme" title="Toggle light or dark theme">
+              <svg id="themeIconSun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;" aria-hidden="true">
+                <circle cx="12" cy="12" r="5"/>
+                <line x1="12" y1="1" x2="12" y2="3"/>
+                <line x1="12" y1="21" x2="12" y2="23"/>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                <line x1="1" y1="12" x2="3" y2="12"/>
+                <line x1="21" y1="12" x2="23" y2="12"/>
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+              </svg>
+              <svg id="themeIconMoon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Data Sync & Source Status Strip -->
+    <div class="sync-strip no-print">
+      <div class="container sync-strip-inner">
+        <div class="sync-meta">
+          <span>Source: <strong id="dataSourceLabel">Google Sheets</strong></span>
+          <span class="meta-sep" aria-hidden="true">·</span>
+          <span>Last data update: <strong id="lastSyncLabel" class="tabular-nums">Not yet synced</strong></span>
+          <span class="meta-sep" aria-hidden="true">·</span>
+          <span>Loaded records: <strong id="totalLoadedLabel" class="tabular-nums">0</strong></span>
+          <span class="meta-sep" aria-hidden="true">·</span>
+          <span>Monetary unit: Currency unspecified in source</span>
+        </div>
+
+        <div class="sync-controls">
+          <button class="btn" id="toggleDrawerBtn" type="button" style="min-height:32px; padding:5px 12px; font-size:12.5px;">
+            Data Source &amp; CSV Upload
+          </button>
+          <input type="file" id="csvFileInput" accept=".csv,text/csv" hidden />
+        </div>
+      </div>
+    </div>
+
+    <!-- Collapsible Data Source Drawer (Google Sheet URL + CSV Upload) -->
+    <section class="sheet-drawer no-print" id="sheetDrawer" aria-label="Data source configuration">
+      <div class="container sheet-drawer-grid">
+        <div class="drawer-box">
+          <h3 class="drawer-title">Google Sheets Live Connection</h3>
+          <p class="drawer-desc">
+            Paste a public Google Sheets link (shared as "Anyone with the link can view") or published CSV URL, then click Sync Sheet.
+          </p>
+          <div class="input-row">
+            <input
+              type="text"
+              id="sheetUrlInput"
+              class="text-input tabular-nums"
+              value="https://docs.google.com/spreadsheets/d/1b2K7wAHEFvLtSP_AS9Fof995XThMX28axA23sYMeUvk/edit?gid=1504952695#gid=1504952695"
+              aria-label="Google Sheets URL"
+              placeholder="https://docs.google.com/spreadsheets/d/.../edit?gid=..."
+            />
+            <button class="btn btn-primary" id="applySheetUrlBtn" type="button">Load URL</button>
+          </div>
+        </div>
+
+        <div class="drawer-box">
+          <h3 class="drawer-title">Local CSV File Upload</h3>
+          <p class="drawer-desc">
+            Upload a local bank customer CSV file directly in your browser. Zero data leaves your device.
+          </p>
+          <div class="dropzone" id="csvDropzone" tabindex="0" role="button" aria-label="Upload CSV file">
+            <strong>Choose a CSV file</strong> or drag &amp; drop it here
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <main class="main-content">
+      <div class="container">
+        <!-- Error / Status Alert Banner -->
+        <div class="alert-banner no-print" id="alertBanner" role="alert">
+          <div>
+            <strong id="alertTitle">Data Error</strong>
+            <div id="alertMessage" style="margin-top:2px;"></div>
+          </div>
+          <button class="alert-close" id="alertCloseBtn" type="button" aria-label="Dismiss notification">&times;</button>
+        </div>
+
+        <!-- Shared Cross-Tab Filters -->
+        <section class="filter-panel no-print" aria-label="Shared dataset filters">
+          <div class="filter-header">
+            <div class="filter-title-group">
+              <h2 class="filter-title">Portfolio Filters</h2>
+              <span class="filter-count" id="filterStatusText">showing 0 of 0 customers</span>
+            </div>
+            <button class="btn btn-reset-filters" id="resetFiltersBtn" type="button">
+              Reset Filters
+            </button>
+          </div>
+
+          <div class="filter-grid">
+            <div class="filter-field">
+              <label class="filter-label" for="fGeography">Geography</label>
+              <select class="select-input" id="fGeography"><option value="ALL">All</option></select>
+            </div>
+            <div class="filter-field">
+              <label class="filter-label" for="fGender">Gender</label>
+              <select class="select-input" id="fGender"><option value="ALL">All</option></select>
+            </div>
+            <div class="filter-field">
+              <label class="filter-label" for="fAgeGroup">Age Group</label>
+              <select class="select-input" id="fAgeGroup">
+                <option value="ALL">All</option>
+                <option value="<30">Under 30</option>
+                <option value="30-39">30 – 39</option>
+                <option value="40-49">40 – 49</option>
+                <option value="50-59">50 – 59</option>
+                <option value="60+">60+</option>
+              </select>
+            </div>
+            <div class="filter-field">
+              <label class="filter-label" for="fTenure">Tenure</label>
+              <select class="select-input" id="fTenure">
+                <option value="ALL">All</option>
+                <option value="0-2">0 – 2 yrs</option>
+                <option value="3-5">3 – 5 yrs</option>
+                <option value="6-8">6 – 8 yrs</option>
+                <option value="9-10">9 – 10 yrs</option>
+              </select>
+            </div>
+            <div class="filter-field">
+              <label class="filter-label" for="fProducts">Products</label>
+              <select class="select-input" id="fProducts"><option value="ALL">All</option></select>
+            </div>
+            <div class="filter-field">
+              <label class="filter-label" for="fCardType">Card Type</label>
+              <select class="select-input" id="fCardType"><option value="ALL">All</option></select>
+            </div>
+            <div class="filter-field">
+              <label class="filter-label" for="fActive">Active Member</label>
+              <select class="select-input" id="fActive">
+                <option value="ALL">All</option>
+                <option value="1">Active</option>
+                <option value="0">Inactive</option>
+              </select>
+            </div>
+            <div class="filter-field">
+              <label class="filter-label" for="fComplain">Complaints</label>
+              <select class="select-input" id="fComplain">
+                <option value="ALL">All</option>
+                <option value="1">Filed Complaint</option>
+                <option value="0">No Complaint</option>
+              </select>
+            </div>
+            <div class="filter-field">
+              <label class="filter-label" for="fExited">Churn Status</label>
+              <select class="select-input" id="fExited">
+                <option value="ALL">All</option>
+                <option value="0">Retained (0)</option>
+                <option value="1">Churned (1)</option>
+              </select>
+            </div>
+          </div>
+        </section>
+
+        <!-- Empty / Initial Loading State Container -->
+        <div class="state-overlay" id="emptyStateBox" style="display:none;">
+          <h3 id="emptyStateTitle">Loading Meridian Bank dataset…</h3>
+          <p id="emptyStateDesc">Connecting to Google Sheets to retrieve customer records.</p>
+          <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+            <button class="btn btn-primary" id="emptyRetryBtn" type="button">Sync Sheet</button>
+            <button class="btn" id="emptyResetFiltersBtn" type="button" style="display:none;">Reset Filters</button>
+            <button class="btn" id="emptyUploadBtn" type="button">Upload CSV File</button>
+          </div>
+        </div>
+
+        <!-- TAB 1: OVERVIEW -->
+        <section class="tab-panel active" id="tab-overview" role="tabpanel">
+          <!-- 5 Overview KPIs -->
+          <div class="kpi-accent-bar" aria-hidden="true"></div>
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-label">Total Customers</div>
+              <div class="kpi-value tabular-nums" id="ovKpiTotal">—</div>
+              <div class="kpi-sub" id="ovKpiTotalSub">Filtered cohort</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">Churned Customers</div>
+              <div class="kpi-value danger tabular-nums" id="ovKpiChurned">—</div>
+              <div class="kpi-sub" id="ovKpiChurnedSub">Exited = 1</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">Churn Rate</div>
+              <div class="kpi-value danger tabular-nums" id="ovKpiChurnRate">—</div>
+              <div class="kpi-sub" id="ovKpiChurnRateSub">Portfolio baseline</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">Active Customers</div>
+              <div class="kpi-value accent tabular-nums" id="ovKpiActive">—</div>
+              <div class="kpi-sub" id="ovKpiActiveSub">IsActiveMember = 1</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">Average Customer Balance</div>
+              <div class="kpi-value tabular-nums" id="ovKpiAvgBalance">—</div>
+              <div class="kpi-sub" id="ovKpiAvgBalanceSub">Currency unspecified</div>
+            </div>
+          </div>
+
+          <div class="section-bar">
+            <h2 class="section-heading">Portfolio Churn &amp; Segment Overview</h2>
+            <span class="section-note">All figures dynamically calculated from active filters · No temporal trends (no date field in dataset)</span>
+          </div>
+
+          <!-- 8 Overview Charts -->
+          <div class="charts-grid">
+            <div class="chart-card">
+              <div class="chart-header">
+                <div>
+                  <h3 class="chart-title">Churn Distribution</h3>
+                  <p class="chart-subtitle">Retained (Exited = 0) vs. Churned (Exited = 1)</p>
+                </div>
+              </div>
+              <div class="chart-wrap"><canvas id="chartOvChurnDist"></canvas></div>
+            </div>
+
+            <div class="chart-card">
+              <div class="chart-header">
+                <div>
+                  <h3 class="chart-title">Churn by Geography</h3>
+                  <p class="chart-subtitle">Customer volume and churn rate (%) across regions</p>
+                </div>
+              </div>
+              <div class="chart-wrap"><canvas id="chartOvGeography"></canvas></div>
+            </div>
+
+            <div class="chart-card">
+              <div class="chart-header">
+                <div>
+                  <h3 class="chart-title">Churn by Gender</h3>
+                  <p class="chart-subtitle">Retained vs. Churned customers and churn rate (%)</p>
+                </div>
+              </div>
+              <div class="chart-wrap"><canvas id="chartOvGender"></canvas></div>
+            </div>
+
+            <div class="chart-card">
+              <div class="chart-header">
+                <div>
+                  <h3 class="chart-title">Churn by Age Group</h3>
+                  <p class="chart-subtitle">Volume and churn rate (%) across age brackets</p>
+                </div>
+              </div>
+              <div class="chart-wrap"><canvas id="chartOvAgeGroup"></canvas></div>
+            </div>
+
+            <div class="chart-card">
+              <div class="chart-header">
+                <div>
+                  <h3 class="chart-title">Churn by Number of Products</h3>
+                  <p class="chart-subtitle">Product holding depth vs. churn volume and rate (%)</p>
+                </div>
+              </div>
+              <div class="chart-wrap"><canvas id="chartOvProducts"></canvas></div>
+            </div>
+
+            <div class="chart-card">
+              <div class="chart-header">
+                <div>
+                  <h3 class="chart-title">Customer Activity Status</h3>
+                  <p class="chart-subtitle">Active vs. Inactive member retention comparison</p>
+                </div>
+              </div>
+              <div class="chart-wrap"><canvas id="chartOvActivity"></canvas></div>
+            </div>
+
+            <div class="chart-card">
+              <div class="chart-header">
+                <div>
+                  <h3 class="chart-title">Churn by Card Type</h3>
+                  <p class="chart-subtitle">Distribution and churn rate (%) across card tiers</p>
+                </div>
+              </div>
+              <div class="chart-wrap"><canvas id="chartOvCardType"></canvas></div>
+            </div>
+
+            <div class="chart-card">
+              <div class="chart-header">
+                <div>
+                  <h3 class="chart-title">Credit Score Distribution</h3>
+                  <p class="chart-subtitle">Customer counts by credit score band and churn status</p>
+                </div>
+              </div>
+              <div class="chart-wrap"><canvas id="chartOvCreditScore"></canvas></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 2: DEEP DIVE -->
+        <section class="tab-panel" id="tab-deepdive" role="tabpanel">
+          <!-- 5 Deep Dive KPIs -->
+          <div class="kpi-accent-bar" aria-hidden="true"></div>
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-label">Average Age</div>
+              <div class="kpi-value tabular-nums" id="ddKpiAge">—</div>
+              <div class="kpi-sub" id="ddKpiAgeSub">Years</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">Average Tenure</div>
+              <div class="kpi-value tabular-nums" id="ddKpiTenure">—</div>
+              <div class="kpi-sub" id="ddKpiTenureSub">Years with bank</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">Credit Card Ownership</div>
+              <div class="kpi-value accent tabular-nums" id="ddKpiCrCard">—</div>
+              <div class="kpi-sub" id="ddKpiCrCardSub">HasCrCard = 1</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">Average Satisfaction Score</div>
+              <div class="kpi-value tabular-nums" id="ddKpiSatisfaction">—</div>
+              <div class="kpi-sub" id="ddKpiSatisfactionSub">Scale 1 to 5</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">Complaint Rate</div>
+              <div class="kpi-value danger tabular-nums" id="ddKpiComplain">—</div>
+              <div class="kpi-sub" id="ddKpiComplainSub">Complain = 1</div>
+            </div>
+          </div>
+
+          <div class="section-bar">
+            <h2 class="section-heading">Diagnostic Customer &amp; Behavioral Analysis</h2>
+            <span class="section-note">Balances and Estimated Salaries displayed as raw numeric units (currency unspecified)</span>
+          </div>
+
+          <div class="charts-grid">
+            <div class="chart-card">
+              <div class="chart-header">
+                <div>
+                  <h3 class="chart-title">Customer Demographics: Age Group &times; Gender Churn Rate</h3>
+                  <p class="chart-subtitle">Churn rate (%) comparison between Female and Male cohorts</p>
+                </div>
+              </div>
+              <div class="chart-wrap"><canvas id="chartDdDemographics"></canvas></div>
+            </div>
+
+            <div class="chart-card">
+              <div class="chart-header">
+                <div>
+                  <h3 class="chart-title">Balance Analysis</h3>
+                  <p class="chart-subtitle">Customer volume and churn rate (%) across balance brackets</p>
+                </div>
+              </div>
+              <div class="chart-wrap"><canvas id="chartDdBalance"></canvas></div>
+            </div>
+
+            <div class="chart-card">
+              <div class="chart-header">
+                <div>
+                  <h3 class="chart-title">Credit Score Tiers &amp; Churn Rate</h3>
+                  <p class="chart-subtitle">Volume and churn rate (%) by standard credit score bands</p>
+                </div>
+              </div>
+              <div class="chart-wrap"><canvas id="chartDdCreditTiers"></canvas></div>
+            </div>
+
+            <div class="chart-card">
+              <div class="chart-header">
+                <div>
+                  <h3 class="chart-title">Churn Rate by Product Count &amp; Card Type</h3>
+                  <p class="chart-subtitle">Comparing churn rate (%) across product tiers and card categories</p>
+                </div>
+              </div>
+              <div class="chart-wrap"><canvas id="chartDdProductCard"></canvas></div>
+            </div>
+
+            <div class="chart-card">
+              <div class="chart-header">
+                <div>
+                  <h3 class="chart-title">Customer Satisfaction Analysis</h3>
+                  <p class="chart-subtitle">Customer volume and churn rate (%) by Satisfaction Score (1–5)</p>
+                </div>
+              </div>
+              <div class="chart-wrap"><canvas id="chartDdSatisfaction"></canvas></div>
+            </div>
+
+            <div class="chart-card">
+              <div class="chart-header">
+                <div>
+                  <h3 class="chart-title">Complaints Analysis</h3>
+                  <p class="chart-subtitle">Churn rate (%) by complaint status and regional complaint rates</p>
+                </div>
+              </div>
+              <div class="chart-wrap"><canvas id="chartDdComplaints"></canvas></div>
+            </div>
+
+            <div class="chart-card">
+              <div class="chart-header">
+                <div>
+                  <h3 class="chart-title">Income Distribution (Estimated Salary)</h3>
+                  <p class="chart-subtitle">Customer volume and churn rate (%) across salary brackets</p>
+                </div>
+              </div>
+              <div class="chart-wrap"><canvas id="chartDdIncome"></canvas></div>
+            </div>
+
+            <div class="chart-card">
+              <div class="chart-header">
+                <div>
+                  <h3 class="chart-title">Customer Behavior: Loyalty Points &amp; Tenure</h3>
+                  <p class="chart-subtitle">Churn rate (%) across Point Earned brackets and Tenure bands</p>
+                </div>
+              </div>
+              <div class="chart-wrap"><canvas id="chartDdBehavior"></canvas></div>
+            </div>
+          </div>
+
+          <!-- Searchable, Sortable Customer Table -->
+          <div class="section-bar">
+            <h2 class="section-heading">Customer Ledger</h2>
+            <span class="section-note">Click column headers to sort · Click any row for full profile and risk breakdown</span>
+          </div>
+
+          <div class="table-card">
+            <div class="table-toolbar">
+              <div class="table-search-wrap">
+                <input
+                  type="search"
+                  id="tableSearchInput"
+                  class="text-input"
+                  placeholder="Search CustomerId, Surname, Geography, or Card Type…"
+                  aria-label="Search customer table"
+                />
+              </div>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <label for="pageSizeSelect" style="font-size:12px; color:var(--text-muted); font-weight:600;">Rows:</label>
+                <select id="pageSizeSelect" class="select-input" style="width:auto; min-height:34px; padding:4px 8px;">
+                  <option value="15" selected>15</option>
+                  <option value="25">25</option>
+                  <option value="50">50</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="table-scroll">
+              <table class="data-table" id="customerTable">
+                <thead>
+                  <tr>
+                    <th class="sortable" data-sort="CustomerId">Customer ID</th>
+                    <th class="sortable" data-sort="Surname">Surname</th>
+                    <th class="sortable" data-sort="Geography">Geography</th>
+                    <th class="sortable" data-sort="Gender">Gender</th>
+                    <th class="sortable num" data-sort="Age">Age</th>
+                    <th class="sortable num" data-sort="Tenure">Tenure</th>
+                    <th class="sortable num" data-sort="Balance">Balance</th>
+                    <th class="sortable num" data-sort="NumOfProducts">Products</th>
+                    <th class="sortable num" data-sort="CreditScore">Credit Score</th>
+                    <th class="sortable" data-sort="CardType">Card Type</th>
+                    <th class="sortable num" data-sort="SatisfactionScore">Satisfaction</th>
+                    <th class="sortable" data-sort="Complain">Complaint</th>
+                    <th class="sortable num" data-sort="riskScore">Risk Score</th>
+                    <th class="sortable" data-sort="Exited">Status</th>
+                  </tr>
+                </thead>
+                <tbody id="customerTableBody"></tbody>
+              </table>
+            </div>
+
+            <div class="table-footer">
+              <div id="tableRangeInfo" class="tabular-nums">Showing 0–0 of 0</div>
+              <div class="pagination-controls">
+                <button class="btn" id="prevPageBtn" type="button" style="min-height:32px; padding:4px 10px;">Previous</button>
+                <span id="pageIndicator" class="tabular-nums" style="padding:0 6px;">Page 1 / 1</span>
+                <button class="btn" id="nextPageBtn" type="button" style="min-height:32px; padding:4px 10px;">Next</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 3: RETENTION INSIGHTS -->
+        <section class="tab-panel" id="tab-retention" role="tabpanel">
+          <div class="section-bar" style="margin-top:0;">
+            <h2 class="section-heading">Automated Executive Findings</h2>
+            <span class="section-note">Dynamically generated from active portfolio filters</span>
+          </div>
+
+          <div class="insights-grid" id="insightsGrid"></div>
+
+          <!-- Methodology & Correlation vs Causation -->
+          <div class="two-col-split">
+            <div class="surface-card">
+              <h3 class="chart-title" style="font-size:16px;">Rule-Based Retention Risk Scoring Methodology</h3>
+              <p class="chart-subtitle" style="margin-top:4px; line-height:1.55;">
+                Every customer receives a transparent, deterministic score from <strong>0 to 100</strong> computed directly from seven observable account attributes. No black-box weights or unverified estimates are used.
+              </p>
+
+              <table class="rule-table">
+                <thead>
+                  <tr>
+                    <th>Observable Risk Factor</th>
+                    <th>Rule Condition</th>
+                    <th style="text-align:right;">Max Weight</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>Complaint Signal</strong></td>
+                    <td><code>Complain = 1</code> (+35 pts)</td>
+                    <td class="pts">+35</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Product Concentration</strong></td>
+                    <td><code>3+ products</code> (+20 pts) · <code>1 product</code> (+8 pts) · <code>2 products</code> (0 pts)</td>
+                    <td class="pts">+20</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Account Inactivity</strong></td>
+                    <td><code>IsActiveMember = 0</code> (+15 pts)</td>
+                    <td class="pts">+15</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Age Risk Band</strong></td>
+                    <td><code>Age 45–64</code> (+12 pts) · <code>Age 35–44 or 65+</code> (+6 pts)</td>
+                    <td class="pts">+12</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Satisfaction Deficit</strong></td>
+                    <td><code>Score 1–2</code> (+8 pts) · <code>Score 3</code> (+4 pts) · <code>Score 4–5</code> (0 pts)</td>
+                    <td class="pts">+8</td>
+                  </tr>
+                  <tr>
+                    <td><strong>High Balance Exposure</strong></td>
+                    <td><code>Balance &ge; 100,000</code> (+5 pts rate/asset sensitivity)</td>
+                    <td class="pts">+5</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Credit Friction</strong></td>
+                    <td><code>CreditScore &lt; 600</code> (+5 pts)</td>
+                    <td class="pts">+5</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div class="tier-grid" id="riskTierGrid">
+                <div class="tier-box">
+                  <div class="tier-box-label" style="color:var(--state-critical);">Critical Risk</div>
+                  <div class="tier-box-range">75 – 100 pts</div>
+                  <div class="tier-box-count" id="tierCriticalCount">0</div>
+                </div>
+                <div class="tier-box">
+                  <div class="tier-box-label" style="color:var(--state-warning);">High Risk</div>
+                  <div class="tier-box-range">50 – 74 pts</div>
+                  <div class="tier-box-count" id="tierHighCount">0</div>
+                </div>
+                <div class="tier-box">
+                  <div class="tier-box-label" style="color:var(--brand-royal);">Moderate Risk</div>
+                  <div class="tier-box-range">25 – 49 pts</div>
+                  <div class="tier-box-count" id="tierModerateCount">0</div>
+                </div>
+                <div class="tier-box">
+                  <div class="tier-box-label" style="color:var(--state-positive);">Low Risk</div>
+                  <div class="tier-box-range">0 – 24 pts</div>
+                  <div class="tier-box-count" id="tierLowCount">0</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="surface-card" style="display:flex; flex-direction:column; justify-content:space-between;">
+              <div>
+                <h3 class="chart-title" style="font-size:16px;">Correlation vs. Causation Notice</h3>
+                <p class="chart-subtitle" style="margin-top:4px; line-height:1.55;">
+                  This dataset is a cross-sectional customer snapshot without timestamps. Observed patterns indicate <strong>statistical association</strong>, not standalone causal proof.
+                </p>
+                <ul class="causation-list">
+                  <li>
+                    <strong>Complaints &amp; Exit Timing:</strong> A filed complaint strongly co-occurs with churn, but a cross-sectional snapshot cannot distinguish whether an unresolved complaint caused the departure or was logged during the account closure process.
+                  </li>
+                  <li>
+                    <strong>Product Count &amp; Account Structure:</strong> Higher churn among 3–4 product holders may reflect bundled fee structures, legacy product migration, or uncompetitive rates rather than product quantity itself causing churn.
+                  </li>
+                  <li>
+                    <strong>Balance &amp; Geography Effects:</strong> Regional churn disparities can stem from local competitive offers, branch closures, or demographic mix rather than customer geography directly driving attrition.
+                  </li>
+                </ul>
+              </div>
+              <div style="margin-top:16px; padding-top:14px; border-top:1px solid var(--border-hairline);">
+                <div style="font-size:12.5px; font-weight:700; color:var(--text-primary); margin-bottom:6px;">Risk Distribution (Filtered Cohort)</div>
+                <div style="height:140px; position:relative;"><canvas id="chartRetRiskDist"></canvas></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Top-10 Retention Risk Watchlist -->
+          <div class="section-bar">
+            <div>
+              <h2 class="section-heading">Top-10 Customer Retention Risk Watchlist</h2>
+              <span class="section-note" id="watchlistScopeNote">Ranked by rule-based risk score, balance exposure, and satisfaction</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <label for="watchlistScopeSelect" style="font-size:12.5px; font-weight:600; color:var(--text-muted);">Scope:</label>
+              <select id="watchlistScopeSelect" class="select-input" style="width:auto; min-height:34px; padding:4px 10px;">
+                <option value="RETAINED">Retained Customers (Actionable)</option>
+                <option value="ALL">All Filtered Customers</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="table-card">
+            <div class="table-scroll">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Rank</th>
+                    <th>Customer</th>
+                    <th>Profile</th>
+                    <th class="num">Balance</th>
+                    <th class="num">Products</th>
+                    <th class="num">Risk Score</th>
+                    <th>Risk Tier</th>
+                    <th>Score Explanation (Triggered Rules)</th>
+                    <th>Recommended Action</th>
+                  </tr>
+                </thead>
+                <tbody id="watchlistBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Strategic Retention Actions -->
+          <div class="section-bar">
+            <h2 class="section-heading">Recommended Retention Actions</h2>
+            <span class="section-note">Prioritized dynamically for the active filtered portfolio</span>
+          </div>
+          <div class="actions-grid" id="recommendedActionsGrid"></div>
+        </section>
+      </div>
+    </main>
+
+    <footer class="app-footer no-print">
+      <div class="container footer-inner">
+        <span>Meridian Bank Customer Churn Analytics · Client-side analytical workspace (zero server storage)</span>
+        <span id="footerSyncNote" class="tabular-nums">Ready</span>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Customer Detail Modal -->
+  <div class="modal-backdrop no-print" id="customerModal" role="dialog" aria-modal="true" aria-labelledby="customerModalTitle">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div>
+          <h3 id="customerModalTitle" style="margin:0; font-size:16px;">Customer Profile</h3>
+          <div id="customerModalSub" style="font-size:12.5px; color:var(--text-muted); margin-top:2px;"></div>
+        </div>
+        <button class="btn" id="closeCustomerModalBtn" type="button" style="min-height:32px; padding:4px 10px;">Close</button>
+      </div>
+      <div class="modal-body" id="customerModalBody"></div>
+    </div>
+  </div>
+
+  <!-- Executive Printable Summary Modal -->
+  <div class="modal-backdrop" id="summaryModal" role="dialog" aria-modal="true" aria-labelledby="summaryModalTitle">
+    <div class="modal-dialog wide">
+      <div class="modal-header no-print">
+        <div>
+          <h3 id="summaryModalTitle" style="margin:0; font-size:16px;">Executive Management Summary</h3>
+          <div style="font-size:12.5px; color:var(--text-muted); margin-top:2px;">Formatted for board reporting, printing, or PDF export</div>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-primary" id="printSummaryBtn" type="button">Print / Save PDF</button>
+          <button class="btn" id="closeSummaryModalBtn" type="button">Close</button>
+        </div>
+      </div>
+      <div class="modal-body" id="summaryModalBody"></div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      'use strict';
+
+      // -----------------------------------------------------------------------
+      // Configuration & Application State
+      // -----------------------------------------------------------------------
+      const DEFAULT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1b2K7wAHEFvLtSP_AS9Fof995XThMX28axA23sYMeUvk/edit?gid=1504952695#gid=1504952695';
+
+      const REQUIRED_FIELDS = [
+        'CustomerId', 'Surname', 'CreditScore', 'Geography', 'Gender',
+        'Age', 'Tenure', 'Balance', 'NumOfProducts', 'HasCrCard',
+        'IsActiveMember', 'EstimatedSalary', 'Exited', 'Complain',
+        'SatisfactionScore', 'CardType', 'PointEarned'
+      ];
+
+      const state = {
+        rawCustomers: [],
+        filteredCustomers: [],
+        activeTab: 'overview',
+        dataSource: 'Google Sheets',
+        lastSyncTime: null,
+        isSyncing: false,
+        sheetUrl: DEFAULT_SHEET_URL,
+        filters: {
+          geography: 'ALL',
+          gender: 'ALL',
+          ageGroup: 'ALL',
+          tenure: 'ALL',
+          products: 'ALL',
+          cardType: 'ALL',
+          active: 'ALL',
+          complain: 'ALL',
+          exited: 'ALL'
+        },
+        table: {
+          search: '',
+          sortKey: 'riskScore',
+          sortDir: 'desc',
+          page: 1,
+          pageSize: 15
+        },
+        watchlistScope: 'RETAINED',
+        charts: {}
+      };
+
+      // -----------------------------------------------------------------------
+      // DOM References
+      // -----------------------------------------------------------------------
+      const el = (id) => document.getElementById(id);
+
+      const dom = {
+        appShell: el('appShell'),
+        brandLogo: el('brandLogo'),
+        syncSheetBtn: el('syncSheetBtn'),
+        syncIcon: el('syncIcon'),
+        syncBtnLabel: el('syncBtnLabel'),
+        themeToggleBtn: el('themeToggleBtn'),
+        themeIconSun: el('themeIconSun'),
+        themeIconMoon: el('themeIconMoon'),
+        toggleDrawerBtn: el('toggleDrawerBtn'),
+        sheetDrawer: el('sheetDrawer'),
+        sheetUrlInput: el('sheetUrlInput'),
+        applySheetUrlBtn: el('applySheetUrlBtn'),
+        csvFileInput: el('csvFileInput'),
+        csvDropzone: el('csvDropzone'),
+        openSummaryBtn: el('openSummaryBtn'),
+        downloadHtmlBtn: el('downloadHtmlBtn'),
+        alertBanner: el('alertBanner'),
+        alertTitle: el('alertTitle'),
+        alertMessage: el('alertMessage'),
+        alertCloseBtn: el('alertCloseBtn'),
+        dataSourceLabel: el('dataSourceLabel'),
+        lastSyncLabel: el('lastSyncLabel'),
+        totalLoadedLabel: el('totalLoadedLabel'),
+        footerSyncNote: el('footerSyncNote'),
+        filterStatusText: el('filterStatusText'),
+        resetFiltersBtn: el('resetFiltersBtn'),
+        emptyStateBox: el('emptyStateBox'),
+        emptyStateTitle: el('emptyStateTitle'),
+        emptyStateDesc: el('emptyStateDesc'),
+        emptyRetryBtn: el('emptyRetryBtn'),
+        emptyResetFiltersBtn: el('emptyResetFiltersBtn'),
+        emptyUploadBtn: el('emptyUploadBtn'),
+        // Filters
+        fGeography: el('fGeography'),
+        fGender: el('fGender'),
+        fAgeGroup: el('fAgeGroup'),
+        fTenure: el('fTenure'),
+        fProducts: el('fProducts'),
+        fCardType: el('fCardType'),
+        fActive: el('fActive'),
+        fComplain: el('fComplain'),
+        fExited: el('fExited'),
+        // Table
+        tableSearchInput: el('tableSearchInput'),
+        pageSizeSelect: el('pageSizeSelect'),
+        customerTableBody: el('customerTableBody'),
+        tableRangeInfo: el('tableRangeInfo'),
+        prevPageBtn: el('prevPageBtn'),
+        nextPageBtn: el('nextPageBtn'),
+        pageIndicator: el('pageIndicator'),
+        // Retention
+        insightsGrid: el('insightsGrid'),
+        watchlistScopeSelect: el('watchlistScopeSelect'),
+        watchlistScopeNote: el('watchlistScopeNote'),
+        watchlistBody: el('watchlistBody'),
+        recommendedActionsGrid: el('recommendedActionsGrid'),
+        // Modals
+        customerModal: el('customerModal'),
+        customerModalTitle: el('customerModalTitle'),
+        customerModalSub: el('customerModalSub'),
+        customerModalBody: el('customerModalBody'),
+        closeCustomerModalBtn: el('closeCustomerModalBtn'),
+        summaryModal: el('summaryModal'),
+        summaryModalBody: el('summaryModalBody'),
+        printSummaryBtn: el('printSummaryBtn'),
+        closeSummaryModalBtn: el('closeSummaryModalBtn')
+      };
+
+      // -----------------------------------------------------------------------
+      // Formatting & Utility Helpers
+      // -----------------------------------------------------------------------
+      const fmtInt = (n) => Number.isFinite(n) ? Math.round(n).toLocaleString('en-US') : '—';
+      const fmtDec = (n, d = 2) => Number.isFinite(n)
+        ? n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d })
+        : '—';
+      const fmtPct = (num, denom, d = 1) => {
+        if (!denom) return '0.0%';
+        return ((num / denom) * 100).toFixed(d) + '%';
+      };
+
+      function escapeHtml(str) {
+        return String(str ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function formatTimestamp(date) {
+        if (!date) return 'Not yet synced';
+        return date.toLocaleString(undefined, {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        });
+      }
+
+      function getAgeGroup(age) {
+        if (age < 30) return '<30';
+        if (age < 40) return '30-39';
+        if (age < 50) return '40-49';
+        if (age < 60) return '50-59';
+        return '60+';
+      }
+
+      function getTenureGroup(tenure) {
+        if (tenure <= 2) return '0-2';
+        if (tenure <= 5) return '3-5';
+        if (tenure <= 8) return '6-8';
+        return '9-10';
+      }
+
+      function showAlert(title, message, type = 'error') {
+        dom.alertTitle.textContent = title;
+        dom.alertMessage.textContent = message;
+        dom.alertBanner.className = 'alert-banner visible no-print' + (type === 'info' ? ' info' : '');
+      }
+
+      function hideAlert() {
+        dom.alertBanner.className = 'alert-banner no-print';
+      }
+
+      // -----------------------------------------------------------------------
+      // Theme Management & Chart Palette
+      // -----------------------------------------------------------------------
+      function isDarkMode() {
+        return document.documentElement.classList.contains('dark');
+      }
+
+      function applyTheme(dark) {
+        document.documentElement.classList.toggle('dark', dark);
+        dom.themeIconSun.style.display = dark ? 'block' : 'none';
+        dom.themeIconMoon.style.display = dark ? 'none' : 'block';
+        try { localStorage.setItem('meridian_theme', dark ? 'dark' : 'light'); } catch (_) {}
+        if (state.rawCustomers.length > 0) {
+          renderActiveTabCharts();
+        }
+      }
+
+      function getChartColors() {
+        const dark = isDarkMode();
+        return {
+          text: dark ? '#CBD5E1' : '#43556B',
+          textStrong: dark ? '#F8FAFC' : '#0B1F3A',
+          grid: dark ? 'rgba(148, 163, 184, 0.14)' : 'rgba(11, 31, 58, 0.08)',
+          tooltipBg: dark ? '#060E1A' : '#0B1F3A',
+          tooltipBorder: '#FF9900',
+          retained: dark ? '#4E8FE3' : '#174A7E',
+          retainedSoft: dark ? 'rgba(78, 143, 227, 0.78)' : 'rgba(23, 74, 126, 0.86)',
+          navy: dark ? '#93C5FD' : '#0B1F3A',
+          churned: dark ? '#F87171' : '#B91C1C',
+          churnedSoft: dark ? 'rgba(248, 113, 113, 0.85)' : 'rgba(185, 28, 28, 0.88)',
+          gold: '#C8A96A',
+          goldLine: '#FF9900',
+          emerald: dark ? '#4ADE80' : '#15803D',
+          amber: '#FF9900'
+        };
+      }
+
+      // -----------------------------------------------------------------------
+      // Transparent Rule-Based Retention Risk Scoring Engine (0 - 100)
+      // -----------------------------------------------------------------------
+      function computeRetentionRisk(c) {
+        let score = 0;
+        const reasons = [];
+        const actions = [];
+
+        if (c.Complain === 1) {
+          score += 35;
+          reasons.push('Filed complaint (+35)');
+          actions.push('Escalate unresolved complaint for immediate 48-hour service recovery');
+        }
+
+        if (c.NumOfProducts >= 3) {
+          score += 20;
+          reasons.push(`${c.NumOfProducts} products (+20)`);
+          actions.push('Audit multi-product fee structure and consolidate redundant accounts');
+        } else if (c.NumOfProducts === 1) {
+          score += 8;
+          reasons.push('Single product (+8)');
+          actions.push('Offer tailored secondary relationship product to deepen engagement');
+        }
+
+        if (c.IsActiveMember === 0) {
+          score += 15;
+          reasons.push('Inactive member (+15)');
+          actions.push('Initiate proactive relationship manager check-in & digital reactivation');
+        }
+
+        if (c.Age >= 45 && c.Age <= 64) {
+          score += 12;
+          reasons.push(`Age ${c.Age} peak band (+12)`);
+          actions.push('Provide dedicated wealth/retirement portfolio review');
+        } else if ((c.Age >= 35 && c.Age <= 44) || c.Age >= 65) {
+          score += 6;
+          reasons.push(`Age ${c.Age} mid-risk band (+6)`);
+        }
+
+        if (c.SatisfactionScore <= 2) {
+          score += 8;
+          reasons.push(`Satisfaction ${c.SatisfactionScore}/5 (+8)`);
+          actions.push('Conduct direct customer feedback outreach to address service friction');
+        } else if (c.SatisfactionScore === 3) {
+          score += 4;
+          reasons.push('Satisfaction 3/5 (+4)');
+        }
+
+        if (c.Balance >= 100000) {
+          score += 5;
+          reasons.push('Balance >= 100k (+5)');
+          actions.push('Present competitive deposit rate or premier tier fee waiver');
+        }
+
+        if (c.CreditScore < 600) {
+          score += 5;
+          reasons.push(`CreditScore ${c.CreditScore} <600 (+5)`);
+          actions.push('Offer financial wellness review or credit-building guidance');
+        }
+
+        score = Math.min(100, score);
+
+        let category = 'Low';
+        if (score >= 75) category = 'Critical';
+        else if (score >= 50) category = 'High';
+        else if (score >= 25) category = 'Moderate';
+
+        if (actions.length === 0) {
+          actions.push('Maintain standard lifecycle engagement and periodic loyalty touchpoints');
+        }
+
+        return {
+          riskScore: score,
+          riskCategory: category,
+          riskReasons: reasons.length ? reasons : ['No elevated risk triggers (+0)'],
+          recommendedAction: actions[0],
+          allActions: actions
+        };
+      }
+
+      // -----------------------------------------------------------------------
+      // Google Sheets URL Resolver & CSV Normalization
+      // -----------------------------------------------------------------------
+      function resolveGoogleSheetCsvUrl(rawInput) {
+        const input = (rawInput || '').trim();
+        if (!input) {
+          throw new Error('Please enter a Google Sheets URL or Spreadsheet ID.');
+        }
+
+        // Direct published CSV URL
+        if (/^https?:\/\//i.test(input) && (input.includes('output=csv') || input.includes('tqx=out:csv') || /\.csv(\?|$)/i.test(input))) {
+          const sep = input.includes('?') ? '&' : '?';
+          return `${input}${sep}_sync=${Date.now()}`;
+        }
+
+        let sheetId = null;
+        let gid = null;
+
+        // Match standard Google Sheets URL: /spreadsheets/d/<ID>/...
+        const fullMatch = input.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]{15,})/);
+        if (fullMatch) {
+          sheetId = fullMatch[1];
+        } else {
+          // Support bare sheet ID or "<ID>/edit?gid=..."
+          const bareMatch = input.match(/^([a-zA-Z0-9-_]{20,})(?:\/|$|\?|#)/);
+          if (bareMatch) {
+            sheetId = bareMatch[1];
+          }
+        }
+
+        if (!sheetId) {
+          throw new Error('Invalid Google Sheets URL. Expected a URL containing /spreadsheets/d/<SHEET_ID> or a valid spreadsheet ID.');
+        }
+
+        const gidMatch = input.match(/[?&#]gid=(\d+)/);
+        if (gidMatch) {
+          gid = gidMatch[1];
+        }
+
+        return `https://docs.google.com/spreadsheets/d/${encodeURIComponent(sheetId)}/gviz/tq?tqx=out:csv${gid ? `&gid=${encodeURIComponent(gid)}` : ''}&_sync=${Date.now()}`;
+      }
+
+      function normalizeRowKeys(row) {
+        const mapped = {};
+        for (const [k, v] of Object.entries(row)) {
+          const cleanKey = (k || '').trim();
+          if (!cleanKey) continue;
+          const compact = cleanKey.toLowerCase().replace(/[\s_]+/g, '');
+          if (compact === 'rownumber') mapped.RowNumber = v;
+          else if (compact === 'customerid') mapped.CustomerId = v;
+          else if (compact === 'surname') mapped.Surname = v;
+          else if (compact === 'creditscore') mapped.CreditScore = v;
+          else if (compact === 'geography') mapped.Geography = v;
+          else if (compact === 'gender') mapped.Gender = v;
+          else if (compact === 'age') mapped.Age = v;
+          else if (compact === 'tenure') mapped.Tenure = v;
+          else if (compact === 'balance') mapped.Balance = v;
+          else if (compact === 'numofproducts') mapped.NumOfProducts = v;
+          else if (compact === 'hascrcard') mapped.HasCrCard = v;
+          else if (compact === 'isactivemember') mapped.IsActiveMember = v;
+          else if (compact === 'estimatedsalary') mapped.EstimatedSalary = v;
+          else if (compact === 'exited') mapped.Exited = v;
+          else if (compact === 'complain') mapped.Complain = v;
+          else if (compact === 'satisfactionscore') mapped.SatisfactionScore = v;
+          else if (compact === 'cardtype') mapped.CardType = v;
+          else if (compact === 'pointearned' || compact === 'pointsearned') mapped.PointEarned = v;
+        }
+        return mapped;
+      }
+
+      function parseNumeric(val, fallback = 0) {
+        if (typeof val === 'number') return Number.isFinite(val) ? val : fallback;
+        const cleaned = String(val ?? '').replace(/,/g, '').trim();
+        if (!cleaned) return fallback;
+        const num = Number(cleaned);
+        return Number.isFinite(num) ? num : fallback;
+      }
+
+      function ingestCsvText(csvText, sourceName) {
+        if (typeof Papa === 'undefined') {
+          throw new Error('PapaParse library failed to load. Check your network connection and reload.');
+        }
+
+        if (!csvText || !csvText.trim()) {
+          throw new Error('The retrieved CSV file is empty.');
+        }
+
+        const trimmed = csvText.trim();
+        if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html') || trimmed.startsWith('<HTML')) {
+          throw new Error('Permission error: Google Sheets returned an HTML sign-in or error page instead of CSV data. Set sheet sharing to "Anyone with the link can view", or upload the CSV file locally.');
+        }
+
+        const parsed = Papa.parse(csvText, {
+          header: true,
+          skipEmptyLines: 'greedy',
+          transformHeader: (h) => (h || '').trim()
+        });
+
+        if (parsed.errors && parsed.errors.length > 0 && (!parsed.data || parsed.data.length === 0)) {
+          throw new Error(`CSV parsing failed: ${parsed.errors[0].message}`);
+        }
+
+        if (!parsed.data || parsed.data.length === 0) {
+          throw new Error('No customer rows were found in the dataset.');
+        }
+
+        const firstNormalized = normalizeRowKeys(parsed.data[0]);
+        const missingCols = REQUIRED_FIELDS.filter((col) => !(col in firstNormalized));
+        if (missingCols.length > 0) {
+          throw new Error(`Dataset schema mismatch. Missing required column(s): ${missingCols.join(', ')}`);
+        }
+
+        const customers = [];
+        for (let i = 0; i < parsed.data.length; i++) {
+          const r = normalizeRowKeys(parsed.data[i]);
+          const custId = String(r.CustomerId ?? '').trim();
+          if (!custId) continue;
+
+          const c = {
+            RowNumber: parseNumeric(r.RowNumber, i + 1),
+            CustomerId: custId,
+            Surname: String(r.Surname ?? '').trim() || 'Unknown',
+            CreditScore: parseNumeric(r.CreditScore, 0),
+            Geography: String(r.Geography ?? '').trim() || 'Unknown',
+            Gender: String(r.Gender ?? '').trim() || 'Unknown',
+            Age: parseNumeric(r.Age, 0),
+            Tenure: parseNumeric(r.Tenure, 0),
+            Balance: parseNumeric(r.Balance, 0),
+            NumOfProducts: parseNumeric(r.NumOfProducts, 0),
+            HasCrCard: parseNumeric(r.HasCrCard, 0) === 1 ? 1 : 0,
+            IsActiveMember: parseNumeric(r.IsActiveMember, 0) === 1 ? 1 : 0,
+            EstimatedSalary: parseNumeric(r.EstimatedSalary, 0),
+            Exited: parseNumeric(r.Exited, 0) === 1 ? 1 : 0,
+            Complain: parseNumeric(r.Complain, 0) === 1 ? 1 : 0,
+            SatisfactionScore: parseNumeric(r.SatisfactionScore, 0),
+            CardType: String(r.CardType ?? '').trim().toUpperCase() || 'STANDARD',
+            PointEarned: parseNumeric(r.PointEarned, 0)
+          };
+          c.ageGroup = getAgeGroup(c.Age);
+          c.tenureGroup = getTenureGroup(c.Tenure);
+
+          const risk = computeRetentionRisk(c);
+          c.riskScore = risk.riskScore;
+          c.riskCategory = risk.riskCategory;
+          c.riskReasons = risk.riskReasons;
+          c.recommendedAction = risk.recommendedAction;
+          c.allActions = risk.allActions;
+
+          customers.push(c);
+        }
+
+        if (customers.length === 0) {
+          throw new Error('Dataset contained headers but zero valid customer records.');
+        }
+
+        state.rawCustomers = customers;
+        state.dataSource = sourceName;
+        state.lastSyncTime = new Date();
+
+        populateDynamicFilterOptions();
+        resetFilters(false);
+        applyFiltersAndRender();
+        hideAlert();
+      }
+
+      async function syncGoogleSheet() {
+        if (state.isSyncing) return;
+
+        let csvUrl;
+        try {
+          csvUrl = resolveGoogleSheetCsvUrl(dom.sheetUrlInput.value);
+          state.sheetUrl = dom.sheetUrlInput.value.trim();
+        } catch (err) {
+          showAlert('Invalid Google Sheets URL', err.message, 'error');
+          updateEmptyState();
+          return;
+        }
+
+        state.isSyncing = true;
+        dom.syncSheetBtn.disabled = true;
+        dom.syncIcon.classList.add('spin');
+        dom.syncBtnLabel.textContent = 'Syncing…';
+
+        if (state.rawCustomers.length === 0) {
+          dom.emptyStateTitle.textContent = 'Syncing Meridian Bank dataset…';
+          dom.emptyStateDesc.textContent = 'Retrieving live customer records from Google Sheets.';
+          dom.emptyStateBox.style.display = 'block';
+        }
+
+        try {
+          const response = await fetch(csvUrl, {
+            method: 'GET',
+            mode: 'cors',
+            cache: 'no-store'
+          });
+
+          if (response.status === 401 || response.status === 403) {
+            throw new Error('Permission denied (HTTP ' + response.status + '). Ensure the Google Sheet sharing setting is "Anyone with the link can view", or upload the CSV file directly.');
+          }
+          if (response.status === 404) {
+            throw new Error('Google Sheet or tab GID not found (HTTP 404). Verify the spreadsheet ID and GID in Data Source settings.');
+          }
+          if (!response.ok) {
+            throw new Error(`Unable to retrieve Google Sheet (HTTP ${response.status}). Please retry or upload a CSV file.`);
+          }
+
+          const contentType = (response.headers.get('content-type') || '').toLowerCase();
+          const text = await response.text();
+
+          if (contentType.includes('text/html') || text.trim().startsWith('<')) {
+            throw new Error('Access restricted: Google Sheets returned a sign-in page instead of CSV data. Set sheet visibility to "Anyone with the link can view", or upload the CSV file.');
+          }
+
+          ingestCsvText(text, 'Google Sheets (Live Sync)');
+        } catch (err) {
+          let message = err && err.message ? err.message : 'Unknown error while syncing Google Sheet.';
+          if (err && err.name === 'TypeError' && message.toLowerCase().includes('fetch')) {
+            message = 'Network or CORS error reaching Google Sheets. Check your internet connection, ensure the sheet is publicly readable, or upload the CSV file locally.';
+          }
+          showAlert('Google Sheet Sync Failed', message, 'error');
+          updateEmptyState(message);
+        } finally {
+          state.isSyncing = false;
+          dom.syncSheetBtn.disabled = false;
+          dom.syncIcon.classList.remove('spin');
+          dom.syncBtnLabel.textContent = 'Sync Sheet';
+          updateSyncMetaUI();
+        }
+      }
+
+      function handleCsvFileUpload(file) {
+        if (!file) return;
+        if (!file.name.toLowerCase().endsWith('.csv') && file.type !== 'text/csv') {
+          showAlert('Unsupported File Type', 'Please upload a valid .csv file.', 'error');
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            ingestCsvText(e.target.result, `Uploaded CSV (${file.name})`);
+            updateSyncMetaUI();
+            dom.sheetDrawer.classList.remove('open');
+          } catch (err) {
+            showAlert('CSV Import Error', err.message, 'error');
+            updateEmptyState(err.message);
+          }
+        };
+        reader.onerror = () => {
+          showAlert('File Read Error', 'Could not read the selected CSV file.', 'error');
+        };
+        reader.readAsText(file);
+      }
+
+      function updateSyncMetaUI() {
+        dom.dataSourceLabel.textContent = state.dataSource;
+        dom.lastSyncLabel.textContent = formatTimestamp(state.lastSyncTime);
+        dom.totalLoadedLabel.textContent = fmtInt(state.rawCustomers.length);
+        dom.footerSyncNote.textContent = state.lastSyncTime
+          ? `Last synced: ${formatTimestamp(state.lastSyncTime)} · ${fmtInt(state.rawCustomers.length)} records`
+          : 'Awaiting data sync';
+      }
+
+      // -----------------------------------------------------------------------
+      // Dynamic Filters & Filtering Pipeline
+      // -----------------------------------------------------------------------
+      function populateDynamicFilterOptions() {
+        const geos = [...new Set(state.rawCustomers.map(c => c.Geography))].sort();
+        const genders = [...new Set(state.rawCustomers.map(c => c.Gender))].sort();
+        const prods = [...new Set(state.rawCustomers.map(c => c.NumOfProducts))].sort((a, b) => a - b);
+        const cards = [...new Set(state.rawCustomers.map(c => c.CardType))].sort();
+
+        setSelectOptions(dom.fGeography, geos.map(v => ({ value: v, label: v })), 'All');
+        setSelectOptions(dom.fGender, genders.map(v => ({ value: v, label: v })), 'All');
+        setSelectOptions(dom.fProducts, prods.map(v => ({ value: String(v), label: `${v} Product${v === 1 ? '' : 's'}` })), 'All');
+        setSelectOptions(dom.fCardType, cards.map(v => ({ value: v, label: v })), 'All');
+      }
+
+      function setSelectOptions(selectEl, items, allLabel) {
+        const current = selectEl.value;
+        selectEl.innerHTML = `<option value="ALL">${escapeHtml(allLabel)}</option>` +
+          items.map(item => `<option value="${escapeHtml(item.value)}">${escapeHtml(item.label)}</option>`).join('');
+        if ([...selectEl.options].some(opt => opt.value === current)) {
+          selectEl.value = current;
+        } else {
+          selectEl.value = 'ALL';
+        }
+      }
+
+      function readFiltersFromDOM() {
+        state.filters = {
+          geography: dom.fGeography.value,
+          gender: dom.fGender.value,
+          ageGroup: dom.fAgeGroup.value,
+          tenure: dom.fTenure.value,
+          products: dom.fProducts.value,
+          cardType: dom.fCardType.value,
+          active: dom.fActive.value,
+          complain: dom.fComplain.value,
+          exited: dom.fExited.value
+        };
+      }
+
+      function resetFilters(shouldRender = true) {
+        dom.fGeography.value = 'ALL';
+        dom.fGender.value = 'ALL';
+        dom.fAgeGroup.value = 'ALL';
+        dom.fTenure.value = 'ALL';
+        dom.fProducts.value = 'ALL';
+        dom.fCardType.value = 'ALL';
+        dom.fActive.value = 'ALL';
+        dom.fComplain.value = 'ALL';
+        dom.fExited.value = 'ALL';
+        readFiltersFromDOM();
+        state.table.page = 1;
+        if (shouldRender) applyFiltersAndRender();
+      }
+
+      function applyFiltersAndRender() {
+        const f = state.filters;
+        state.filteredCustomers = state.rawCustomers.filter(c => {
+          if (f.geography !== 'ALL' && c.Geography !== f.geography) return false;
+          if (f.gender !== 'ALL' && c.Gender !== f.gender) return false;
+          if (f.ageGroup !== 'ALL' && c.ageGroup !== f.ageGroup) return false;
+          if (f.tenure !== 'ALL' && c.tenureGroup !== f.tenure) return false;
+          if (f.products !== 'ALL' && String(c.NumOfProducts) !== f.products) return false;
+          if (f.cardType !== 'ALL' && c.CardType !== f.cardType) return false;
+          if (f.active !== 'ALL' && String(c.IsActiveMember) !== f.active) return false;
+          if (f.complain !== 'ALL' && String(c.Complain) !== f.complain) return false;
+          if (f.exited !== 'ALL' && String(c.Exited) !== f.exited) return false;
+          return true;
+        });
+
+        // Auto-adjust watchlist scope when user explicitly filters to Churned
+        if (f.exited === '1' && state.watchlistScope === 'RETAINED') {
+          state.watchlistScope = 'ALL';
+          dom.watchlistScopeSelect.value = 'ALL';
+        }
+
+        state.table.page = 1;
+        dom.filterStatusText.textContent = `Showing ${fmtInt(state.filteredCustomers.length)} of ${fmtInt(state.rawCustomers.length)} customers`;
+
+        updateEmptyState();
+
+        if (state.filteredCustomers.length > 0) {
+          renderKPIs();
+          renderActiveTabCharts();
+          renderCustomerTable();
+          renderRetentionInsights();
+        }
+      }
+
+      function updateEmptyState(errorMsg = '') {
+        const hasRaw = state.rawCustomers.length > 0;
+        const hasFiltered = state.filteredCustomers.length > 0;
+
+        document.querySelectorAll('.tab-panel').forEach(p => {
+          p.style.display = hasFiltered ? '' : 'none';
+        });
+
+        if (!hasRaw) {
+          dom.emptyStateBox.style.display = 'block';
+          dom.emptyRetryBtn.style.display = 'inline-flex';
+          dom.emptyUploadBtn.style.display = 'inline-flex';
+          dom.emptyResetFiltersBtn.style.display = 'none';
+          if (errorMsg) {
+            dom.emptyStateTitle.textContent = 'Dataset Unavailable';
+            dom.emptyStateDesc.textContent = errorMsg;
+          }
+        } else if (!hasFiltered) {
+          dom.emptyStateBox.style.display = 'block';
+          dom.emptyStateTitle.textContent = 'No Customers Match Current Filters';
+          dom.emptyStateDesc.textContent = 'Adjust or reset one or more portfolio filters above to view analytics.';
+          dom.emptyRetryBtn.style.display = 'none';
+          dom.emptyUploadBtn.style.display = 'none';
+          dom.emptyResetFiltersBtn.style.display = 'inline-flex';
+        } else {
+          dom.emptyStateBox.style.display = 'none';
+        }
+      }
+
+      // -----------------------------------------------------------------------
+      // KPI Calculations (Overview 5 + Deep Dive 5)
+      // -----------------------------------------------------------------------
+      function computeMetrics(list) {
+        const n = list.length;
+        if (!n) {
+          return {
+            n: 0, churned: 0, retained: 0, churnRate: 0, active: 0, activeRate: 0,
+            avgBalance: 0, avgAge: 0, minAge: 0, maxAge: 0, avgTenure: 0,
+            crCard: 0, crCardRate: 0, avgSat: 0, complain: 0, complainRate: 0,
+            churnedBalance: 0, retainedBalance: 0
+          };
+        }
+        let churned = 0, active = 0, sumBal = 0, sumAge = 0, sumTenure = 0, crCard = 0, sumSat = 0, complain = 0;
+        let minAge = Infinity, maxAge = -Infinity;
+        let churnedBal = 0, retainedBal = 0;
+
+        for (const c of list) {
+          if (c.Exited === 1) {
+            churned++;
+            churnedBal += c.Balance;
+          } else {
+            retainedBal += c.Balance;
+          }
+          if (c.IsActiveMember === 1) active++;
+          if (c.HasCrCard === 1) crCard++;
+          if (c.Complain === 1) complain++;
+          sumBal += c.Balance;
+          sumAge += c.Age;
+          sumTenure += c.Tenure;
+          sumSat += c.SatisfactionScore;
+          if (c.Age < minAge) minAge = c.Age;
+          if (c.Age > maxAge) maxAge = c.Age;
+        }
+
+        const retained = n - churned;
+        return {
+          n,
+          churned,
+          retained,
+          churnRate: (churned / n) * 100,
+          active,
+          activeRate: (active / n) * 100,
+          avgBalance: sumBal / n,
+          avgAge: sumAge / n,
+          minAge,
+          maxAge,
+          avgTenure: sumTenure / n,
+          crCard,
+          crCardRate: (crCard / n) * 100,
+          avgSat: sumSat / n,
+          complain,
+          complainRate: (complain / n) * 100,
+          churnedBalance: churnedBal,
+          retainedBalance: retainedBal
+        };
+      }
+
+      function renderKPIs() {
+        const m = computeMetrics(state.filteredCustomers);
+        const totalAll = state.rawCustomers.length;
+        const baseMetrics = computeMetrics(state.rawCustomers);
+
+        // Overview 5 KPIs
+        el('ovKpiTotal').textContent = fmtInt(m.n);
+        el('ovKpiTotalSub').textContent = totalAll ? `${fmtPct(m.n, totalAll)} of ${fmtInt(totalAll)} total records` : 'Filtered cohort';
+
+        el('ovKpiChurned').textContent = fmtInt(m.churned);
+        el('ovKpiChurnedSub').textContent = `${fmtInt(m.retained)} retained in selection`;
+
+        el('ovKpiChurnRate').textContent = m.churnRate.toFixed(1) + '%';
+        const diff = m.churnRate - baseMetrics.churnRate;
+        el('ovKpiChurnRateSub').textContent = state.filteredCustomers.length === totalAll
+          ? 'Overall portfolio churn rate'
+          : `${diff >= 0 ? '+' : ''}${diff.toFixed(1)} pp vs. full portfolio (${baseMetrics.churnRate.toFixed(1)}%)`;
+
+        el('ovKpiActive').textContent = fmtInt(m.active);
+        el('ovKpiActiveSub').textContent = `${m.activeRate.toFixed(1)}% active membership rate`;
+
+        el('ovKpiAvgBalance').textContent = fmtDec(m.avgBalance, 2);
+        const zeroBalCount = state.filteredCustomers.filter(c => c.Balance === 0).length;
+        el('ovKpiAvgBalanceSub').textContent = `${fmtPct(zeroBalCount, m.n)} hold zero balance · Currency unspecified`;
+
+        // Deep Dive 5 KPIs
+        el('ddKpiAge').textContent = fmtDec(m.avgAge, 1) + ' yrs';
+        el('ddKpiAgeSub').textContent = `Range: ${m.minAge} – ${m.maxAge} years`;
+
+        el('ddKpiTenure').textContent = fmtDec(m.avgTenure, 1) + ' yrs';
+        const sortedTenures = state.filteredCustomers.map(c => c.Tenure).sort((a, b) => a - b);
+        const medianTenure = sortedTenures[Math.floor(sortedTenures.length / 2)] ?? 0;
+        el('ddKpiTenureSub').textContent = `Median tenure: ${medianTenure} years`;
+
+        el('ddKpiCrCard').textContent = m.crCardRate.toFixed(1) + '%';
+        el('ddKpiCrCardSub').textContent = `${fmtInt(m.crCard)} of ${fmtInt(m.n)} customers`;
+
+        el('ddKpiSatisfaction').textContent = fmtDec(m.avgSat, 2) + ' / 5';
+        const lowSat = state.filteredCustomers.filter(c => c.SatisfactionScore <= 2).length;
+        el('ddKpiSatisfactionSub').textContent = `${fmtPct(lowSat, m.n)} scored 1 or 2`;
+
+        el('ddKpiComplain').textContent = m.complainRate.toFixed(1) + '%';
+        el('ddKpiComplainSub').textContent = `${fmtInt(m.complain)} customers filed a complaint`;
+      }
+
+      // -----------------------------------------------------------------------
+      // Aggregation Helpers for Charts
+      // -----------------------------------------------------------------------
+      function groupStats(list, keyFn, orderedKeys = null) {
+        const map = new Map();
+        if (orderedKeys) {
+          for (const k of orderedKeys) map.set(k, { key: k, total: 0, churned: 0, retained: 0, complain: 0, sumBal: 0 });
+        }
+        for (const c of list) {
+          const k = keyFn(c);
+          if (!map.has(k)) map.set(k, { key: k, total: 0, churned: 0, retained: 0, complain: 0, sumBal: 0 });
+          const g = map.get(k);
+          g.total++;
+          if (c.Exited === 1) g.churned++;
+          else g.retained++;
+          if (c.Complain === 1) g.complain++;
+          g.sumBal += c.Balance;
+        }
+        return [...map.values()].map(g => ({
+          ...g,
+          churnRate: g.total ? (g.churned / g.total) * 100 : 0,
+          complainRate: g.total ? (g.complain / g.total) * 100 : 0,
+          avgBalance: g.total ? g.sumBal / g.total : 0
+        }));
+      }
+
+      function makeOrUpdateChart(id, config) {
+        const canvas = el(id);
+        if (!canvas || typeof Chart === 'undefined') return;
+        if (state.charts[id]) {
+          state.charts[id].destroy();
+        }
+        state.charts[id] = new Chart(canvas.getContext('2d'), config);
+      }
+
+      function baseChartOptions(colors, { dualAxis = false, stacked = false, yTitle = 'Customers', y2Title = 'Churn Rate (%)' } = {}) {
+        const opts = {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: {
+              position: 'top',
+              align: 'end',
+              labels: {
+                color: colors.text,
+                boxWidth: 11,
+                boxHeight: 11,
+                padding: 12,
+                font: { family: "'Plus Jakarta Sans', sans-serif", size: 11.5, weight: '600' }
+              }
+            },
+            tooltip: {
+              backgroundColor: colors.tooltipBg,
+              titleColor: '#FFFFFF',
+              bodyColor: '#E2E8F0',
+              borderColor: colors.tooltipBorder,
+              borderWidth: 1,
+              padding: 10,
+              cornerRadius: 6,
+              titleFont: { family: "'Plus Jakarta Sans', sans-serif", size: 12, weight: '700' },
+              bodyFont: { family: "'IBM Plex Mono', monospace", size: 11.5 }
+            }
+          },
+          scales: {
+            x: {
+              stacked,
+              grid: { display: false },
+              ticks: { color: colors.text, font: { family: "'Plus Jakarta Sans', sans-serif", size: 11 } }
+            },
+            y: {
+              stacked,
+              beginAtZero: true,
+              grid: { color: colors.grid },
+              ticks: { color: colors.text, font: { family: "'IBM Plex Mono', monospace", size: 11 } },
+              title: {
+                display: Boolean(yTitle),
+                text: yTitle,
+                color: colors.text,
+                font: { family: "'Plus Jakarta Sans', sans-serif", size: 11, weight: '600' }
+              }
+            }
+          }
+        };
+
+        if (dualAxis) {
+          opts.scales.y1 = {
+            position: 'right',
+            beginAtZero: true,
+            suggestedMax: 60,
+            grid: { drawOnChartArea: false },
+            ticks: {
+              color: colors.goldLine,
+              callback: (v) => v + '%',
+              font: { family: "'IBM Plex Mono', monospace", size: 11 }
+            },
+            title: {
+              display: true,
+              text: y2Title,
+              color: colors.goldLine,
+              font: { family: "'Plus Jakarta Sans', sans-serif", size: 11, weight: '600' }
+            }
+          };
+        }
+        return opts;
+      }
+
+      function buildVolumeAndRateConfig(groups, colors, { stacked = true } = {}) {
+        const labels = groups.map(g => g.key);
+        const opts = baseChartOptions(colors, { dualAxis: true, stacked });
+        opts.plugins.tooltip.callbacks = {
+          afterBody: (items) => {
+            const idx = items[0]?.dataIndex ?? 0;
+            const g = groups[idx];
+            return g ? [`Total: ${fmtInt(g.total)} · Churn Rate: ${g.churnRate.toFixed(1)}%`] : [];
+          }
+        };
+        return {
+          type: 'bar',
+          data: {
+            labels,
+            datasets: [
+              {
+                type: 'line',
+                label: 'Churn Rate (%)',
+                data: groups.map(g => Number(g.churnRate.toFixed(1))),
+                yAxisID: 'y1',
+                borderColor: colors.goldLine,
+                backgroundColor: colors.goldLine,
+                borderWidth: 2.5,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                tension: 0.2,
+                order: 0
+              },
+              {
+                label: 'Retained',
+                data: groups.map(g => g.retained),
+                backgroundColor: colors.retainedSoft,
+                borderRadius: stacked ? 0 : 4,
+                order: 1
+              },
+              {
+                label: 'Churned',
+                data: groups.map(g => g.churned),
+                backgroundColor: colors.churnedSoft,
+                borderRadius: 4,
+                order: 2
+              }
+            ]
+          },
+          options: opts
+        };
+      }
+
+      // -----------------------------------------------------------------------
+      // Render Charts by Active Tab
+      // -----------------------------------------------------------------------
+      function renderActiveTabCharts() {
+        if (state.filteredCustomers.length === 0) return;
+        const colors = getChartColors();
+        const data = state.filteredCustomers;
+
+        if (state.activeTab === 'overview') {
+          renderOverviewCharts(data, colors);
+        } else if (state.activeTab === 'deepdive') {
+          renderDeepDiveCharts(data, colors);
+        } else if (state.activeTab === 'retention') {
+          renderRetentionChart(data, colors);
+        }
+      }
+
+      function renderOverviewCharts(data, colors) {
+        const m = computeMetrics(data);
+
+        // 1. Churn Distribution Doughnut
+        makeOrUpdateChart('chartOvChurnDist', {
+          type: 'doughnut',
+          data: {
+            labels: ['Retained (Exited = 0)', 'Churned (Exited = 1)'],
+            datasets: [{
+              data: [m.retained, m.churned],
+              backgroundColor: [colors.retained, colors.churned],
+              borderColor: isDarkMode() ? '#0B1F3A' : '#FFFFFF',
+              borderWidth: 3,
+              hoverOffset: 6
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '64%',
+            plugins: {
+              legend: {
+                position: 'bottom',
+                labels: { color: colors.text, padding: 16, font: { family: "'Plus Jakarta Sans', sans-serif", size: 12, weight: '600' } }
+              },
+              tooltip: {
+                backgroundColor: colors.tooltipBg,
+                padding: 10,
+                callbacks: {
+                  label: (ctx) => ` ${ctx.label}: ${fmtInt(ctx.raw)} (${fmtPct(ctx.raw, m.n)})`
+                }
+              }
+            }
+          }
+        });
+
+        // 2. Geography
+        const geos = groupStats(data, c => c.Geography).sort((a, b) => b.total - a.total);
+        makeOrUpdateChart('chartOvGeography', buildVolumeAndRateConfig(geos, colors));
+
+        // 3. Gender
+        const genders = groupStats(data, c => c.Gender).sort((a, b) => b.total - a.total);
+        makeOrUpdateChart('chartOvGender', buildVolumeAndRateConfig(genders, colors));
+
+        // 4. Age Groups
+        const ageOrder = ['<30', '30-39', '40-49', '50-59', '60+'];
+        const ages = groupStats(data, c => c.ageGroup, ageOrder);
+        makeOrUpdateChart('chartOvAgeGroup', buildVolumeAndRateConfig(ages, colors));
+
+        // 5. Number of Products
+        const prodKeys = [...new Set(data.map(c => c.NumOfProducts))].sort((a, b) => a - b).map(String);
+        const prods = groupStats(data, c => String(c.NumOfProducts), prodKeys);
+        prods.forEach(p => { p.key = p.key + (p.key === '1' ? ' Product' : ' Products'); });
+        makeOrUpdateChart('chartOvProducts', buildVolumeAndRateConfig(prods, colors));
+
+        // 6. Customer Activity
+        const acts = groupStats(data, c => c.IsActiveMember === 1 ? 'Active Member' : 'Inactive Member', ['Active Member', 'Inactive Member']);
+        makeOrUpdateChart('chartOvActivity', buildVolumeAndRateConfig(acts, colors));
+
+        // 7. Card Types
+        const cards = groupStats(data, c => c.CardType).sort((a, b) => b.churnRate - a.churnRate);
+        makeOrUpdateChart('chartOvCardType', buildVolumeAndRateConfig(cards, colors));
+
+        // 8. Credit Score Distribution
+        const csBuckets = ['<500', '500-549', '550-599', '600-649', '650-699', '700-749', '750-799', '800+'];
+        const csGroups = groupStats(data, c => {
+          if (c.CreditScore < 500) return '<500';
+          if (c.CreditScore < 550) return '500-549';
+          if (c.CreditScore < 600) return '550-599';
+          if (c.CreditScore < 650) return '600-649';
+          if (c.CreditScore < 700) return '650-699';
+          if (c.CreditScore < 750) return '700-749';
+          if (c.CreditScore < 800) return '750-799';
+          return '800+';
+        }, csBuckets);
+        makeOrUpdateChart('chartOvCreditScore', buildVolumeAndRateConfig(csGroups, colors));
+      }
+
+      function renderDeepDiveCharts(data, colors) {
+        // 1. Demographics: Age Group x Gender Churn Rate %
+        const ageOrder = ['<30', '30-39', '40-49', '50-59', '60+'];
+        const femaleRates = ageOrder.map(ag => {
+          const sub = data.filter(c => c.ageGroup === ag && c.Gender === 'Female');
+          return sub.length ? Number(((sub.filter(c => c.Exited === 1).length / sub.length) * 100).toFixed(1)) : 0;
+        });
+        const maleRates = ageOrder.map(ag => {
+          const sub = data.filter(c => c.ageGroup === ag && c.Gender === 'Male');
+          return sub.length ? Number(((sub.filter(c => c.Exited === 1).length / sub.length) * 100).toFixed(1)) : 0;
+        });
+        const demoOpts = baseChartOptions(colors, { yTitle: 'Churn Rate (%)' });
+        demoOpts.scales.y.ticks.callback = (v) => v + '%';
+        makeOrUpdateChart('chartDdDemographics', {
+          type: 'bar',
+          data: {
+            labels: ageOrder,
+            datasets: [
+              { label: 'Female Churn Rate (%)', data: femaleRates, backgroundColor: colors.churnedSoft, borderRadius: 4 },
+              { label: 'Male Churn Rate (%)', data: maleRates, backgroundColor: colors.retainedSoft, borderRadius: 4 }
+            ]
+          },
+          options: demoOpts
+        });
+
+        // 2. Balance Analysis
+        const balOrder = ['Zero (0)', '1 – 50k', '50k – 100k', '100k – 150k', '150k+'];
+        const balGroups = groupStats(data, c => {
+          if (c.Balance <= 0) return 'Zero (0)';
+          if (c.Balance < 50000) return '1 – 50k';
+          if (c.Balance < 100000) return '50k – 100k';
+          if (c.Balance < 150000) return '100k – 150k';
+          return '150k+';
+        }, balOrder);
+        makeOrUpdateChart('chartDdBalance', buildVolumeAndRateConfig(balGroups, colors));
+
+        // 3. Credit Score Tiers
+        const tierOrder = ['Poor (<580)', 'Fair (580-669)', 'Good (670-739)', 'Very Good (740-799)', 'Exceptional (800+)'];
+        const tierGroups = groupStats(data, c => {
+          if (c.CreditScore < 580) return 'Poor (<580)';
+          if (c.CreditScore < 670) return 'Fair (580-669)';
+          if (c.CreditScore < 740) return 'Good (670-739)';
+          if (c.CreditScore < 800) return 'Very Good (740-799)';
+          return 'Exceptional (800+)';
+        }, tierOrder);
+        makeOrUpdateChart('chartDdCreditTiers', buildVolumeAndRateConfig(tierGroups, colors));
+
+        // 4. Churn by Product Tier & Card Type (Churn Rate % Comparison)
+        const cardTypes = [...new Set(data.map(c => c.CardType))].sort();
+        const prodCounts = [...new Set(data.map(c => c.NumOfProducts))].sort((a, b) => a - b);
+        const prodRateColors = [colors.retained, colors.gold, colors.amber, colors.churned];
+        const pcOpts = baseChartOptions(colors, { yTitle: 'Churn Rate (%)' });
+        pcOpts.scales.y.ticks.callback = (v) => v + '%';
+        makeOrUpdateChart('chartDdProductCard', {
+          type: 'bar',
+          data: {
+            labels: cardTypes,
+            datasets: prodCounts.map((p, idx) => ({
+              label: `${p} Product${p === 1 ? '' : 's'}`,
+              backgroundColor: prodRateColors[idx % prodRateColors.length],
+              borderRadius: 3,
+              data: cardTypes.map(ct => {
+                const sub = data.filter(c => c.CardType === ct && c.NumOfProducts === p);
+                return sub.length ? Number(((sub.filter(c => c.Exited === 1).length / sub.length) * 100).toFixed(1)) : 0;
+              })
+            }))
+          },
+          options: pcOpts
+        });
+
+        // 5. Customer Satisfaction (1-5)
+        const satKeys = ['1', '2', '3', '4', '5'];
+        const satGroups = groupStats(data, c => String(c.SatisfactionScore), satKeys);
+        satGroups.forEach(g => { g.key = `Score ${g.key}`; });
+        makeOrUpdateChart('chartDdSatisfaction', buildVolumeAndRateConfig(satGroups, colors));
+
+        // 6. Complaints Analysis
+        const compGroups = groupStats(data, c => c.Complain === 1 ? 'Complaint Filed' : 'No Complaint', ['No Complaint', 'Complaint Filed']);
+        const geos = [...new Set(data.map(c => c.Geography))].sort();
+        const geoComp = groupStats(data, c => c.Geography, geos);
+        const compLabels = ['No Complaint (Churn %)', 'Complaint Filed (Churn %)', ...geoComp.map(g => `${g.key} (Complaint %)`)];
+        const compValues = [
+          Number(compGroups[0].churnRate.toFixed(1)),
+          Number(compGroups[1].churnRate.toFixed(1)),
+          ...geoComp.map(g => Number(g.complainRate.toFixed(1)))
+        ];
+        const compOpts = baseChartOptions(colors, { yTitle: 'Rate (%)' });
+        compOpts.plugins.legend.display = false;
+        compOpts.scales.y.ticks.callback = (v) => v + '%';
+        makeOrUpdateChart('chartDdComplaints', {
+          type: 'bar',
+          data: {
+            labels: compLabels,
+            datasets: [{
+              label: 'Rate (%)',
+              data: compValues,
+              backgroundColor: [colors.retained, colors.churned, ...geoComp.map(() => colors.gold)],
+              borderRadius: 4
+            }]
+          },
+          options: compOpts
+        });
+
+        // 7. Income Distribution (Estimated Salary)
+        const incOrder = ['<40k', '40k–80k', '80k–120k', '120k–160k', '160k+'];
+        const incGroups = groupStats(data, c => {
+          if (c.EstimatedSalary < 40000) return '<40k';
+          if (c.EstimatedSalary < 80000) return '40k–80k';
+          if (c.EstimatedSalary < 120000) return '80k–120k';
+          if (c.EstimatedSalary < 160000) return '120k–160k';
+          return '160k+';
+        }, incOrder);
+        makeOrUpdateChart('chartDdIncome', buildVolumeAndRateConfig(incGroups, colors));
+
+        // 8. Customer Behavior: Points Earned & Tenure Churn Rates
+        const ptOrder = ['<250 pts', '250–499 pts', '500–749 pts', '750+ pts'];
+        const ptGroups = groupStats(data, c => {
+          if (c.PointEarned < 250) return '<250 pts';
+          if (c.PointEarned < 500) return '250–499 pts';
+          if (c.PointEarned < 750) return '500–749 pts';
+          return '750+ pts';
+        }, ptOrder);
+        const tenOrder = ['0-2', '3-5', '6-8', '9-10'];
+        const tenGroups = groupStats(data, c => c.tenureGroup, tenOrder);
+        const behOpts = baseChartOptions(colors, { yTitle: 'Churn Rate (%)' });
+        behOpts.scales.y.ticks.callback = (v) => v + '%';
+        makeOrUpdateChart('chartDdBehavior', {
+          type: 'bar',
+          data: {
+            labels: ['Cohort 1', 'Cohort 2', 'Cohort 3', 'Cohort 4'],
+            datasets: [
+              {
+                label: 'Loyalty Points Bracket Churn % (<250 / 250–499 / 500–749 / 750+)',
+                data: ptGroups.map(g => Number(g.churnRate.toFixed(1))),
+                backgroundColor: colors.retainedSoft,
+                borderRadius: 4
+              },
+              {
+                label: 'Tenure Band Churn % (0–2 / 3–5 / 6–8 / 9–10 yrs)',
+                data: tenGroups.map(g => Number(g.churnRate.toFixed(1))),
+                backgroundColor: colors.gold,
+                borderRadius: 4
+              }
+            ]
+          },
+          options: {
+            ...behOpts,
+            plugins: {
+              ...behOpts.plugins,
+              tooltip: {
+                ...behOpts.plugins.tooltip,
+                callbacks: {
+                  title: (items) => {
+                    const idx = items[0]?.dataIndex ?? 0;
+                    return `${ptOrder[idx]}  |  Tenure ${tenOrder[idx]} yrs`;
+                  },
+                  label: (ctx) => ` ${ctx.datasetIndex === 0 ? 'Points Bracket' : 'Tenure Band'}: ${ctx.raw}% churn`
+                }
+              }
+            }
+          }
+        });
+      }
+
+      function renderRetentionChart(data, colors) {
+        const counts = {
+          Low: data.filter(c => c.riskCategory === 'Low').length,
+          Moderate: data.filter(c => c.riskCategory === 'Moderate').length,
+          High: data.filter(c => c.riskCategory === 'High').length,
+          Critical: data.filter(c => c.riskCategory === 'Critical').length
+        };
+        const opts = baseChartOptions(colors, { yTitle: '' });
+        opts.indexAxis = 'y';
+        opts.plugins.legend.display = false;
+        opts.scales.x = {
+          beginAtZero: true,
+          grid: { color: colors.grid },
+          ticks: { color: colors.text, font: { family: "'IBM Plex Mono', monospace", size: 11 } }
+        };
+        opts.scales.y = {
+          grid: { display: false },
+          ticks: { color: colors.textStrong, font: { family: "'Plus Jakarta Sans', sans-serif", size: 11.5, weight: '600' } }
+        };
+
+        makeOrUpdateChart('chartRetRiskDist', {
+          type: 'bar',
+          data: {
+            labels: ['Critical (75–100)', 'High (50–74)', 'Moderate (25–49)', 'Low (0–24)'],
+            datasets: [{
+              data: [counts.Critical, counts.High, counts.Moderate, counts.Low],
+              backgroundColor: [colors.churned, colors.amber, colors.retained, colors.emerald],
+              borderRadius: 4
+            }]
+          },
+          options: opts
+        });
+      }
+
+      // -----------------------------------------------------------------------
+      // Searchable, Sortable, Paginated Customer Table
+      // -----------------------------------------------------------------------
+      function renderCustomerTable() {
+        const q = state.table.search.trim().toLowerCase();
+        let rows = state.filteredCustomers;
+        if (q) {
+          rows = rows.filter(c =>
+            c.CustomerId.toLowerCase().includes(q) ||
+            c.Surname.toLowerCase().includes(q) ||
+            c.Geography.toLowerCase().includes(q) ||
+            c.CardType.toLowerCase().includes(q)
+          );
+        }
+
+        const key = state.table.sortKey;
+        const dir = state.table.sortDir === 'asc' ? 1 : -1;
+        const sorted = [...rows].sort((a, b) => {
+          const va = a[key];
+          const vb = b[key];
+          if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
+          return String(va).localeCompare(String(vb)) * dir;
+        });
+
+        const total = sorted.length;
+        const pageSize = state.table.pageSize;
+        const totalPages = Math.max(1, Math.ceil(total / pageSize));
+        state.table.page = Math.min(state.table.page, totalPages);
+
+        const startIdx = (state.table.page - 1) * pageSize;
+        const pageRows = sorted.slice(startIdx, startIdx + pageSize);
+
+        if (pageRows.length === 0) {
+          dom.customerTableBody.innerHTML = `<tr><td colspan="14" style="text-align:center; padding:28px; color:var(--text-muted);">No matching customers found for search query.</td></tr>`;
+        } else {
+          dom.customerTableBody.innerHTML = pageRows.map(c => `
+            <tr class="clickable" data-cid="${escapeHtml(c.CustomerId)}">
+              <td class="tabular-nums">${escapeHtml(c.CustomerId)}</td>
+              <td><strong>${escapeHtml(c.Surname)}</strong></td>
+              <td>${escapeHtml(c.Geography)}</td>
+              <td>${escapeHtml(c.Gender)}</td>
+              <td class="num tabular-nums">${c.Age}</td>
+              <td class="num tabular-nums">${c.Tenure}y</td>
+              <td class="num tabular-nums">${fmtDec(c.Balance, 2)}</td>
+              <td class="num tabular-nums">${c.NumOfProducts}</td>
+              <td class="num tabular-nums">${c.CreditScore}</td>
+              <td>${escapeHtml(c.CardType)}</td>
+              <td class="num tabular-nums">${c.SatisfactionScore}/5</td>
+              <td>${c.Complain === 1 ? '<span style="color:var(--state-churned); font-weight:600;">Yes</span>' : 'No'}</td>
+              <td class="num tabular-nums"><strong>${c.riskScore}</strong></td>
+              <td>${c.Exited === 1
+                ? '<span class="status-tag status-churned">Churned</span>'
+                : '<span class="status-tag status-retained">Retained</span>'}</td>
+            </tr>
+          `).join('');
+        }
+
+        const shownStart = total === 0 ? 0 : startIdx + 1;
+        const shownEnd = Math.min(startIdx + pageSize, total);
+        dom.tableRangeInfo.textContent = `Showing ${fmtInt(shownStart)}–${fmtInt(shownEnd)} of ${fmtInt(total)} records`;
+        dom.pageIndicator.textContent = `Page ${state.table.page} / ${totalPages}`;
+        dom.prevPageBtn.disabled = state.table.page <= 1;
+        dom.nextPageBtn.disabled = state.table.page >= totalPages;
+      }
+
+      // -----------------------------------------------------------------------
+      // Dynamic Retention Insights, Watchlist & Recommended Actions
+      // -----------------------------------------------------------------------
+      function generateDynamicFindings(data) {
+        const m = computeMetrics(data);
+        const findings = [];
+
+        // 1. Overall Portfolio & Balance Exposure
+        findings.push({
+          kicker: '01. Portfolio Exposure',
+          headline: `${m.churnRate.toFixed(1)}% churn across ${fmtInt(m.n)} customers`,
+          body: `${fmtInt(m.churned)} customers exited (${fmtDec(m.churnedBalance, 0)} total balance in exited accounts), while ${fmtInt(m.retained)} remain retained (${fmtDec(m.retainedBalance, 0)} total balance).`
+        });
+
+        // 2. Geography Disparity
+        const geos = groupStats(data, c => c.Geography).filter(g => g.total >= 5).sort((a, b) => b.churnRate - a.churnRate);
+        if (geos.length >= 2) {
+          const top = geos[0];
+          const low = geos[geos.length - 1];
+          findings.push({
+            kicker: '02. Regional Concentration',
+            headline: `${top.key} exhibits highest churn at ${top.churnRate.toFixed(1)}%`,
+            body: `${top.key} (${fmtInt(top.churned)} of ${fmtInt(top.total)} exited) runs ${(top.churnRate - low.churnRate).toFixed(1)} percentage points above ${low.key} (${low.churnRate.toFixed(1)}%).`
+          });
+        } else if (geos.length === 1) {
+          findings.push({
+            kicker: '02. Regional Slice',
+            headline: `${geos[0].key} churn rate stands at ${geos[0].churnRate.toFixed(1)}%`,
+            body: `Filtered view focuses exclusively on ${geos[0].key} (${fmtInt(geos[0].total)} customers, avg balance ${fmtDec(geos[0].avgBalance, 2)}).`
+          });
+        }
+
+        // 3. Age Cohort Peak
+        const ages = groupStats(data, c => c.ageGroup).filter(g => g.total >= 5).sort((a, b) => b.churnRate - a.churnRate);
+        if (ages.length > 0) {
+          const peak = ages[0];
+          const lowest = ages[ages.length - 1];
+          findings.push({
+            kicker: '03. Demographic Inflection',
+            headline: `Age ${peak.key} records peak attrition (${peak.churnRate.toFixed(1)}%)`,
+            body: `Customers aged ${peak.key} exit at ${peak.churnRate.toFixed(1)}% (${fmtInt(peak.churned)} of ${fmtInt(peak.total)}), compared with ${lowest.churnRate.toFixed(1)}% in the ${lowest.key} cohort.`
+          });
+        }
+
+        // 4. Product Portfolio Dynamics
+        const prods = groupStats(data, c => c.NumOfProducts).sort((a, b) => a.key - b.key);
+        if (prods.length >= 2) {
+          const highestProd = [...prods].sort((a, b) => b.churnRate - a.churnRate)[0];
+          const lowestProd = [...prods].sort((a, b) => a.churnRate - b.churnRate)[0];
+          findings.push({
+            kicker: '04. Product Holding Pattern',
+            headline: `${highestProd.key}-product holders show ${highestProd.churnRate.toFixed(1)}% churn`,
+            body: `Customers holding ${highestProd.key} product(s) exit at ${highestProd.churnRate.toFixed(1)}% (${fmtInt(highestProd.churned)}/${fmtInt(highestProd.total)}), whereas ${lowestProd.key}-product holders sit at ${lowestProd.churnRate.toFixed(1)}%.`
+          });
+        }
+
+        // 5. Activity Engagement Differential
+        const activeGrp = data.filter(c => c.IsActiveMember === 1);
+        const inactiveGrp = data.filter(c => c.IsActiveMember === 0);
+        if (activeGrp.length > 0 && inactiveGrp.length > 0) {
+          const actRate = (activeGrp.filter(c => c.Exited === 1).length / activeGrp.length) * 100;
+          const inactRate = (inactiveGrp.filter(c => c.Exited === 1).length / inactiveGrp.length) * 100;
+          findings.push({
+            kicker: '05. Engagement Gap',
+            headline: `Inactive members churn ${(inactRate - actRate).toFixed(1)} pp higher than active`,
+            body: `Inactive accounts churn at ${inactRate.toFixed(1)}% (${fmtInt(inactiveGrp.length)} customers) versus ${actRate.toFixed(1)}% among active members (${fmtInt(activeGrp.length)} customers).`
+          });
+        }
+
+        // 6. Complaint Association (strictly distinguishing correlation vs causation)
+        const compGrp = data.filter(c => c.Complain === 1);
+        const noCompGrp = data.filter(c => c.Complain === 0);
+        if (compGrp.length > 0 && noCompGrp.length > 0) {
+          const compChurn = (compGrp.filter(c => c.Exited === 1).length / compGrp.length) * 100;
+          const noCompChurn = (noCompGrp.filter(c => c.Exited === 1).length / noCompGrp.length) * 100;
+          findings.push({
+            kicker: '06. Service Friction Signal',
+            headline: `${compChurn.toFixed(1)}% exit rate observed among complaint filers`,
+            body: `Among ${fmtInt(compGrp.length)} customers with Complain = 1, ${compChurn.toFixed(1)}% also show Exited = 1 (vs. ${noCompChurn.toFixed(1)}% with no complaint). This represents strong statistical co-occurrence requiring timeline audit before assuming cause.`
+          });
+        }
+
+        return findings;
+      }
+
+      function renderRetentionInsights() {
+        const data = state.filteredCustomers;
+        const findings = generateDynamicFindings(data);
+
+        dom.insightsGrid.innerHTML = findings.map(f => `
+          <article class="insight-card">
+            <div class="insight-kicker">${escapeHtml(f.kicker)}</div>
+            <h3 class="insight-headline">${escapeHtml(f.headline)}</h3>
+            <p class="insight-body">${escapeHtml(f.body)}</p>
+          </article>
+        `).join('');
+
+        // Risk Tier Counts
+        const counts = { Critical: 0, High: 0, Moderate: 0, Low: 0 };
+        for (const c of data) counts[c.riskCategory]++;
+        const n = data.length;
+        el('tierCriticalCount').textContent = `${fmtInt(counts.Critical)} (${fmtPct(counts.Critical, n)})`;
+        el('tierHighCount').textContent = `${fmtInt(counts.High)} (${fmtPct(counts.High, n)})`;
+        el('tierModerateCount').textContent = `${fmtInt(counts.Moderate)} (${fmtPct(counts.Moderate, n)})`;
+        el('tierLowCount').textContent = `${fmtInt(counts.Low)} (${fmtPct(counts.Low, n)})`;
+
+        if (state.activeTab === 'retention') {
+          renderRetentionChart(data, getChartColors());
+        }
+
+        // Top-10 Watchlist
+        const scope = state.watchlistScope;
+        let pool = scope === 'RETAINED' ? data.filter(c => c.Exited === 0) : data;
+        if (scope === 'RETAINED' && pool.length === 0 && data.length > 0) {
+          dom.watchlistScopeNote.textContent = 'No retained customers in current filter — switch Scope to "All Filtered Customers" to inspect exited profiles.';
+        } else {
+          dom.watchlistScopeNote.textContent = scope === 'RETAINED'
+            ? 'Showing top 10 Retained (Exited = 0) customers ranked by Risk Score, Balance, and Satisfaction'
+            : 'Showing top 10 customers across all filtered statuses ranked by Risk Score and Balance';
+        }
+
+        const top10 = [...pool]
+          .sort((a, b) =>
+            (b.riskScore - a.riskScore) ||
+            (b.Balance - a.Balance) ||
+            (a.SatisfactionScore - b.SatisfactionScore) ||
+            (b.Age - a.Age)
+          )
+          .slice(0, 10);
+
+        if (top10.length === 0) {
+          dom.watchlistBody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:24px; color:var(--text-muted);">No customers available in the selected watchlist scope.</td></tr>`;
+        } else {
+          dom.watchlistBody.innerHTML = top10.map((c, idx) => {
+            const tierCls = 'risk-' + c.riskCategory.toLowerCase();
+            return `
+              <tr class="clickable" data-cid="${escapeHtml(c.CustomerId)}">
+                <td class="tabular-nums"><strong>#${idx + 1}</strong></td>
+                <td>
+                  <div><strong>${escapeHtml(c.Surname)}</strong></div>
+                  <div class="tabular-nums" style="font-size:11.5px; color:var(--text-muted);">${escapeHtml(c.CustomerId)}</div>
+                </td>
+                <td>
+                  <div>${escapeHtml(c.Geography)} · ${escapeHtml(c.Gender)}, ${c.Age}y</div>
+                  <div style="font-size:11.5px; color:var(--text-muted);">${c.IsActiveMember ? 'Active' : 'Inactive'} · Sat ${c.SatisfactionScore}/5</div>
+                </td>
+                <td class="num tabular-nums">${fmtDec(c.Balance, 2)}</td>
+                <td class="num tabular-nums">${c.NumOfProducts}</td>
+                <td class="num tabular-nums"><strong>${c.riskScore}</strong> / 100</td>
+                <td><span class="status-tag ${tierCls}">${escapeHtml(c.riskCategory)}</span></td>
+                <td style="max-width:260px; font-size:12px; color:var(--text-secondary);">${escapeHtml(c.riskReasons.join(' · '))}</td>
+                <td style="max-width:260px; font-size:12px;">${escapeHtml(c.recommendedAction)}</td>
+              </tr>
+            `;
+          }).join('');
+        }
+
+        // Recommended Strategic Actions based on dominant cohort drivers
+        const retainedPool = data.filter(c => c.Exited === 0);
+        const targetPool = retainedPool.length > 0 ? retainedPool : data;
+        const inactiveCount = targetPool.filter(c => c.IsActiveMember === 0).length;
+        const multiProdCount = targetPool.filter(c => c.NumOfProducts >= 3).length;
+        const highBalInactive = targetPool.filter(c => c.Balance >= 100000 && c.IsActiveMember === 0).length;
+        const lowSatCount = targetPool.filter(c => c.SatisfactionScore <= 2).length;
+
+        const recCards = [
+          {
+            kicker: `Priority 1 · ${fmtInt(inactiveCount)} customers affected`,
+            headline: 'Launch Inactive Relationship Reactivation Campaign',
+            body: `${fmtPct(inactiveCount, targetPool.length)} of the target cohort is inactive (IsActiveMember = 0). Deploy personalized digital banking nudges, salary-deposit incentives, and RM outreach for dormant accounts.`
+          },
+          {
+            kicker: `Priority 2 · ${fmtInt(highBalInactive)} high-balance inactive accounts`,
+            headline: 'Protect High-Balance Assets Against Rate Attrition',
+            body: `Customers holding >= 100,000 balance with low engagement represent concentrated deposit risk. Offer relationship tier rate enhancements or fee waivers tied to active primary-bank usage.`
+          },
+          {
+            kicker: `Priority 3 · ${fmtInt(multiProdCount)} multi-product (3+) accounts`,
+            headline: 'Audit 3–4 Product Pricing & Service Complexity',
+            body: `Multi-product accounts exhibit elevated attrition across the portfolio. Review bundled account maintenance fees, cross-product friction, and onboarding quality.`
+          },
+          {
+            kicker: `Priority 4 · ${fmtInt(lowSatCount)} low-satisfaction (1–2/5) profiles`,
+            headline: 'Close the Loop on Service Recovery & Complaints',
+            body: `Establish an automated 24–48 hour escalation SLA whenever a customer logs a complaint or scores satisfaction <= 2, before account closure intent solidifies.`
+          }
+        ];
+
+        dom.recommendedActionsGrid.innerHTML = recCards.map(r => `
+          <article class="insight-card">
+            <div class="insight-kicker">${escapeHtml(r.kicker)}</div>
+            <h3 class="insight-headline">${escapeHtml(r.headline)}</h3>
+            <p class="insight-body">${escapeHtml(r.body)}</p>
+          </article>
+        `).join('');
+      }
+
+      // -----------------------------------------------------------------------
+      // Customer Detail Modal & Executive Print Summary Modal
+      // -----------------------------------------------------------------------
+      function openCustomerModal(customerId) {
+        const c = state.rawCustomers.find(item => item.CustomerId === String(customerId));
+        if (!c) return;
+
+        dom.customerModalTitle.textContent = `${c.Surname} · Customer #${c.CustomerId}`;
+        dom.customerModalSub.textContent = `${c.Geography} · ${c.Gender} · ${c.Age} years · Card: ${c.CardType}`;
+
+        const tierCls = 'risk-' + c.riskCategory.toLowerCase();
+        dom.customerModalBody.innerHTML = `
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px; padding:12px 14px; background:var(--bg-subtle); border:1px solid var(--border-hairline); border-radius:8px; flex-wrap:wrap;">
+            <div>
+              <div style="font-size:12px; color:var(--text-muted); font-weight:600;">Rule-Based Retention Risk Score</div>
+              <div style="font-size:22px; font-weight:700;" class="tabular-nums">${c.riskScore} / 100</div>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <span class="status-tag ${tierCls}">${escapeHtml(c.riskCategory)} Risk</span>
+              ${c.Exited === 1
+                ? '<span class="status-tag status-churned">Churned (Exited = 1)</span>'
+                : '<span class="status-tag status-retained">Retained (Exited = 0)</span>'}
+            </div>
+          </div>
+
+          <div class="detail-grid">
+            <div class="detail-item"><div class="detail-item-label">Balance</div><div class="detail-item-val tabular-nums">${fmtDec(c.Balance, 2)}</div></div>
+            <div class="detail-item"><div class="detail-item-label">Estimated Salary</div><div class="detail-item-val tabular-nums">${fmtDec(c.EstimatedSalary, 2)}</div></div>
+            <div class="detail-item"><div class="detail-item-label">Credit Score</div><div class="detail-item-val tabular-nums">${c.CreditScore}</div></div>
+            <div class="detail-item"><div class="detail-item-label">Products Held</div><div class="detail-item-val tabular-nums">${c.NumOfProducts}</div></div>
+            <div class="detail-item"><div class="detail-item-label">Tenure</div><div class="detail-item-val tabular-nums">${c.Tenure} years</div></div>
+            <div class="detail-item"><div class="detail-item-label">Active Member</div><div class="detail-item-val">${c.IsActiveMember ? 'Yes (1)' : 'No (0)'}</div></div>
+            <div class="detail-item"><div class="detail-item-label">Credit Card</div><div class="detail-item-val">${c.HasCrCard ? 'Yes (1)' : 'No (0)'}</div></div>
+            <div class="detail-item"><div class="detail-item-label">Complaint Filed</div><div class="detail-item-val">${c.Complain ? 'Yes (1)' : 'No (0)'}</div></div>
+            <div class="detail-item"><div class="detail-item-label">Satisfaction / Points</div><div class="detail-item-val tabular-nums">${c.SatisfactionScore}/5 · ${fmtInt(c.PointEarned)} pts</div></div>
+          </div>
+
+          <div style="margin-bottom:14px;">
+            <div style="font-size:13px; font-weight:700; margin-bottom:6px;">Risk Score Breakdown</div>
+            <ul style="margin:0; padding-left:18px; font-size:13px; color:var(--text-secondary);">
+              ${c.riskReasons.map(r => `<li>${escapeHtml(r)}</li>`).join('')}
+            </ul>
+          </div>
+
+          <div>
+            <div style="font-size:13px; font-weight:700; margin-bottom:6px;">Recommended Retention Actions</div>
+            <ul style="margin:0; padding-left:18px; font-size:13px; color:var(--text-secondary);">
+              ${c.allActions.map(a => `<li>${escapeHtml(a)}</li>`).join('')}
+            </ul>
+          </div>
+        `;
+        dom.customerModal.classList.add('open');
+      }
+
+      function openExecutiveSummary() {
+        const data = state.filteredCustomers;
+        if (data.length === 0) {
+          showAlert('Summary Unavailable', 'Load data and ensure at least one customer matches the current filters before generating the executive summary.', 'info');
+          return;
+        }
+        const m = computeMetrics(data);
+        const findings = generateDynamicFindings(data);
+        const scope = state.watchlistScope;
+        const pool = scope === 'RETAINED' ? data.filter(c => c.Exited === 0) : data;
+        const top10 = [...pool].sort((a, b) => (b.riskScore - a.riskScore) || (b.Balance - a.Balance)).slice(0, 10);
+
+        const activeFiltersList = Object.entries(state.filters)
+          .filter(([, v]) => v !== 'ALL')
+          .map(([k, v]) => `${k}: ${v}`);
+
+        dom.summaryModalBody.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px; padding-bottom:14px; border-bottom:2px solid var(--brand-navy); margin-bottom:16px; flex-wrap:wrap;">
+            <div>
+              <h2 style="margin:0; font-size:20px; color:var(--text-primary);">Meridian Bank — Customer Churn Executive Summary</h2>
+              <div style="font-size:12.5px; color:var(--text-muted); margin-top:4px;">
+                Data source: ${escapeHtml(state.dataSource)} · Last updated: ${escapeHtml(formatTimestamp(state.lastSyncTime))} · Cohort: ${fmtInt(m.n)} customers
+              </div>
+              <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">
+                Active filters: ${activeFiltersList.length ? escapeHtml(activeFiltersList.join(' | ')) : 'None (Full Portfolio)'}
+              </div>
+            </div>
+          </div>
+
+          <div class="kpi-grid" style="margin-bottom:16px;">
+            <div class="kpi-card"><div class="kpi-label">Customers</div><div class="kpi-value tabular-nums" style="font-size:20px;">${fmtInt(m.n)}</div></div>
+            <div class="kpi-card"><div class="kpi-label">Churned</div><div class="kpi-value danger tabular-nums" style="font-size:20px;">${fmtInt(m.churned)}</div></div>
+            <div class="kpi-card"><div class="kpi-label">Churn Rate</div><div class="kpi-value danger tabular-nums" style="font-size:20px;">${m.churnRate.toFixed(1)}%</div></div>
+            <div class="kpi-card"><div class="kpi-label">Avg Balance</div><div class="kpi-value tabular-nums" style="font-size:20px;">${fmtDec(m.avgBalance, 2)}</div></div>
+            <div class="kpi-card"><div class="kpi-label">Complaint Rate</div><div class="kpi-value tabular-nums" style="font-size:20px;">${m.complainRate.toFixed(1)}%</div></div>
+          </div>
+
+          <div class="kpi-grid" style="margin-bottom:18px;">
+            <div class="kpi-card"><div class="kpi-label">Active Members</div><div class="kpi-value tabular-nums" style="font-size:18px;">${m.activeRate.toFixed(1)}%</div></div>
+            <div class="kpi-card"><div class="kpi-label">Average Age</div><div class="kpi-value tabular-nums" style="font-size:18px;">${fmtDec(m.avgAge, 1)} yrs</div></div>
+            <div class="kpi-card"><div class="kpi-label">Average Tenure</div><div class="kpi-value tabular-nums" style="font-size:18px;">${fmtDec(m.avgTenure, 1)} yrs</div></div>
+            <div class="kpi-card"><div class="kpi-label">Credit Card Rate</div><div class="kpi-value tabular-nums" style="font-size:18px;">${m.crCardRate.toFixed(1)}%</div></div>
+            <div class="kpi-card"><div class="kpi-label">Avg Satisfaction</div><div class="kpi-value tabular-nums" style="font-size:18px;">${fmtDec(m.avgSat, 2)} / 5</div></div>
+          </div>
+
+          <h4 style="margin:0 0 8px 0; font-size:14px;">Key Analytical Findings</h4>
+          <ul style="margin:0 0 16px 0; padding-left:18px; font-size:12.5px; color:var(--text-secondary); display:flex; flex-direction:column; gap:6px;">
+            ${findings.map(f => `<li><strong>${escapeHtml(f.headline)}:</strong> ${escapeHtml(f.body)}</li>`).join('')}
+          </ul>
+
+          <div style="padding:10px 14px; background:var(--bg-subtle); border:1px solid var(--border-hairline); border-radius:6px; font-size:12px; color:var(--text-secondary); margin-bottom:16px;">
+            <strong>Methodological Note (Correlation vs. Causation):</strong> Findings above summarize cross-sectional associations without temporal ordering. High co-occurrence (such as complaints with account exits) does not alone establish causal direction. Currency units are unspecified in source data.
+          </div>
+
+          <h4 style="margin:0 0 8px 0; font-size:14px;">Top-10 Retention Watchlist (${scope === 'RETAINED' ? 'Retained Customers' : 'All Filtered'})</h4>
+          <table class="data-table" style="border:1px solid var(--border-hairline);">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Customer</th>
+                <th>Geography / Age</th>
+                <th class="num">Balance</th>
+                <th class="num">Risk</th>
+                <th>Tier</th>
+                <th>Primary Risk Drivers &amp; Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${top10.map((c, i) => `
+                <tr>
+                  <td class="tabular-nums">${i + 1}</td>
+                  <td><strong>${escapeHtml(c.Surname)}</strong> <span class="tabular-nums" style="color:var(--text-muted);">(${escapeHtml(c.CustomerId)})</span></td>
+                  <td>${escapeHtml(c.Geography)} · ${c.Age}y · ${c.NumOfProducts} prod</td>
+                  <td class="num tabular-nums">${fmtDec(c.Balance, 2)}</td>
+                  <td class="num tabular-nums"><strong>${c.riskScore}</strong></td>
+                  <td>${escapeHtml(c.riskCategory)}</td>
+                  <td style="font-size:11.5px;">${escapeHtml(c.riskReasons.join(', '))} — <em>${escapeHtml(c.recommendedAction)}</em></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+        dom.summaryModal.classList.add('open');
+      }
+
+      // -----------------------------------------------------------------------
+      // Single-File Standalone HTML Download Builder
+      // -----------------------------------------------------------------------
+      function getInlineLogoDataUri() {
+        try {
+          const img = dom.brandLogo;
+          if (!img || !img.complete || img.naturalWidth === 0) return null;
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          return canvas.toDataURL('image/png');
+        } catch (_) {
+          return null;
+        }
+      }
+
+      function downloadStandaloneHtml() {
+        const clone = document.documentElement.cloneNode(true);
+
+        // Strip Vite dev client scripts if running inside Vite dev server
+        clone.querySelectorAll('script[src*="/@vite"], script[src*="@react-refresh"]').forEach(s => s.remove());
+
+        // Reset runtime classes & dynamic containers in the clone so the downloaded file boots cleanly
+        clone.classList.remove('dark');
+        const q = (sel) => clone.querySelector(sel);
+        const setEmpty = (sel) => { const n = q(sel); if (n) n.innerHTML = ''; };
+        const setText = (sel, txt) => { const n = q(sel); if (n) n.textContent = txt; };
+
+        setEmpty('#customerTableBody');
+        setEmpty('#watchlistBody');
+        setEmpty('#insightsGrid');
+        setEmpty('#recommendedActionsGrid');
+        setEmpty('#customerModalBody');
+        setEmpty('#summaryModalBody');
+
+        setText('#lastSyncLabel', 'Not yet synced');
+        setText('#totalLoadedLabel', '0');
+        setText('#filterStatusText', 'Showing 0 of 0 customers');
+
+        const alertEl = q('#alertBanner');
+        if (alertEl) alertEl.className = 'alert-banner no-print';
+        const cModal = q('#customerModal');
+        if (cModal) cModal.className = 'modal-backdrop no-print';
+        const sModal = q('#summaryModal');
+        if (sModal) sModal.className = 'modal-backdrop';
+        const drawer = q('#sheetDrawer');
+        if (drawer) drawer.className = 'sheet-drawer no-print';
+
+        // Reset canvas attributes mutated by Chart.js
+        clone.querySelectorAll('canvas').forEach(cv => {
+          cv.removeAttribute('style');
+          cv.removeAttribute('width');
+          cv.removeAttribute('height');
+        });
+
+        // Inline the Meridian Bank logo as a base64 PNG so file:// local viewing works offline
+        const dataUri = getInlineLogoDataUri();
+        const clonedLogo = q('#brandLogo');
+        if (clonedLogo && dataUri) {
+          clonedLogo.setAttribute('src', dataUri);
+          clonedLogo.style.display = 'block';
+          const fb = q('#brandLogoFallback');
+          if (fb) fb.style.display = 'none';
+        }
+
+        const htmlString = '<!doctype html>\n' + clone.outerHTML;
+        const blob = new Blob([htmlString], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'Meridian_Bank_Customer_Churn_Analytics.html';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+
+      // -----------------------------------------------------------------------
+      // Event Bindings & Initialization
+      // -----------------------------------------------------------------------
+      function initEvents() {
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const target = btn.dataset.tab;
+            if (target === state.activeTab) return;
+            state.activeTab = target;
+
+            document.querySelectorAll('.tab-btn').forEach(b => {
+              const active = b.dataset.tab === target;
+              b.classList.toggle('active', active);
+              b.setAttribute('aria-selected', String(active));
+            });
+
+            document.querySelectorAll('.tab-panel').forEach(panel => {
+              panel.classList.toggle('active', panel.id === 'tab-' + target);
+            });
+
+            requestAnimationFrame(() => renderActiveTabCharts());
+          });
+        });
+
+        // Theme toggle
+        dom.themeToggleBtn.addEventListener('click', () => applyTheme(!isDarkMode()));
+
+        // Sync Sheet & URL Drawer
+        dom.syncSheetBtn.addEventListener('click', syncGoogleSheet);
+        dom.emptyRetryBtn.addEventListener('click', syncGoogleSheet);
+        dom.applySheetUrlBtn.addEventListener('click', syncGoogleSheet);
+
+        dom.toggleDrawerBtn.addEventListener('click', () => {
+          dom.sheetDrawer.classList.toggle('open');
+        });
+
+        // CSV Upload (button, dropzone, and keyboard)
+        dom.emptyUploadBtn.addEventListener('click', () => dom.csvFileInput.click());
+        dom.csvDropzone.addEventListener('click', () => dom.csvFileInput.click());
+        dom.csvDropzone.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            dom.csvFileInput.click();
+          }
+        });
+        dom.csvFileInput.addEventListener('change', (e) => {
+          if (e.target.files && e.target.files[0]) {
+            handleCsvFileUpload(e.target.files[0]);
+            e.target.value = '';
+          }
+        });
+
+        ['dragenter', 'dragover'].forEach(evt => {
+          dom.csvDropzone.addEventListener(evt, (e) => {
+            e.preventDefault();
+            dom.csvDropzone.classList.add('dragover');
+          });
+        });
+        ['dragleave', 'drop'].forEach(evt => {
+          dom.csvDropzone.addEventListener(evt, (e) => {
+            e.preventDefault();
+            dom.csvDropzone.classList.remove('dragover');
+          });
+        });
+        dom.csvDropzone.addEventListener('drop', (e) => {
+          const file = e.dataTransfer?.files?.[0];
+          if (file) handleCsvFileUpload(file);
+        });
+
+        // Filters
+        [dom.fGeography, dom.fGender, dom.fAgeGroup, dom.fTenure, dom.fProducts, dom.fCardType, dom.fActive, dom.fComplain, dom.fExited]
+          .forEach(sel => sel.addEventListener('change', () => {
+            readFiltersFromDOM();
+            applyFiltersAndRender();
+          }));
+
+        dom.resetFiltersBtn.addEventListener('click', () => resetFilters(true));
+        dom.emptyResetFiltersBtn.addEventListener('click', () => resetFilters(true));
+
+        // Alert dismiss
+        dom.alertCloseBtn.addEventListener('click', hideAlert);
+
+        // Table search, sort, pagination
+        dom.tableSearchInput.addEventListener('input', (e) => {
+          state.table.search = e.target.value;
+          state.table.page = 1;
+          renderCustomerTable();
+        });
+        dom.pageSizeSelect.addEventListener('change', (e) => {
+          state.table.pageSize = Number(e.target.value) || 15;
+          state.table.page = 1;
+          renderCustomerTable();
+        });
+        dom.prevPageBtn.addEventListener('click', () => {
+          if (state.table.page > 1) { state.table.page--; renderCustomerTable(); }
+        });
+        dom.nextPageBtn.addEventListener('click', () => {
+          state.table.page++;
+          renderCustomerTable();
+        });
+
+        document.querySelectorAll('#customerTable th.sortable').forEach(th => {
+          th.addEventListener('click', () => {
+            const key = th.dataset.sort;
+            if (state.table.sortKey === key) {
+              state.table.sortDir = state.table.sortDir === 'asc' ? 'desc' : 'asc';
+            } else {
+              state.table.sortKey = key;
+              state.table.sortDir = ['Surname', 'Geography', 'Gender', 'CardType'].includes(key) ? 'asc' : 'desc';
+            }
+            renderCustomerTable();
+          });
+        });
+
+        // Row click handlers (Customer Table + Watchlist)
+        dom.customerTableBody.addEventListener('click', (e) => {
+          const tr = e.target.closest('tr[data-cid]');
+          if (tr) openCustomerModal(tr.dataset.cid);
+        });
+        dom.watchlistBody.addEventListener('click', (e) => {
+          const tr = e.target.closest('tr[data-cid]');
+          if (tr) openCustomerModal(tr.dataset.cid);
+        });
+
+        // Watchlist Scope
+        dom.watchlistScopeSelect.addEventListener('change', (e) => {
+          state.watchlistScope = e.target.value;
+          renderRetentionInsights();
+        });
+
+        // Modals & Print
+        dom.closeCustomerModalBtn.addEventListener('click', () => dom.customerModal.classList.remove('open'));
+        dom.customerModal.addEventListener('click', (e) => {
+          if (e.target === dom.customerModal) dom.customerModal.classList.remove('open');
+        });
+
+        dom.openSummaryBtn.addEventListener('click', openExecutiveSummary);
+        dom.closeSummaryModalBtn.addEventListener('click', () => {
+          dom.summaryModal.classList.remove('open');
+          dom.appShell.classList.remove('printing-summary');
+        });
+        dom.summaryModal.addEventListener('click', (e) => {
+          if (e.target === dom.summaryModal) {
+            dom.summaryModal.classList.remove('open');
+            dom.appShell.classList.remove('printing-summary');
+          }
+        });
+        dom.printSummaryBtn.addEventListener('click', () => {
+          dom.appShell.classList.add('printing-summary');
+          window.print();
+          setTimeout(() => dom.appShell.classList.remove('printing-summary'), 300);
+        });
+
+        // Download Standalone HTML
+        dom.downloadHtmlBtn.addEventListener('click', downloadStandaloneHtml);
+
+        // Escape key closes open modals
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') {
+            dom.customerModal.classList.remove('open');
+            dom.summaryModal.classList.remove('open');
+            dom.appShell.classList.remove('printing-summary');
+          }
+        });
+      }
+
+      function init() {
+        // Restore theme preference
+        try {
+          const saved = localStorage.getItem('meridian_theme');
+          if (saved === 'dark') applyTheme(true);
+        } catch (_) {}
+
+        initEvents();
+
+        if (typeof Chart === 'undefined' || typeof Papa === 'undefined') {
+          showAlert(
+            'Library Load Error',
+            'Chart.js or PapaParse could not be loaded from CDN. Ensure you are connected to the internet and reload.',
+            'error'
+          );
+        }
+
+        // Initial automatic sync with the configured Google Sheet
+        syncGoogleSheet();
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+      } else {
+        init();
+      }
+    })();
+  </script>
+</body>
+</html>
